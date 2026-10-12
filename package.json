@@ -3,8 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "description": "TrackMate AI — Agentic productivity platform for students and developers",
+  "packageManager": "npm@10.8.2",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "frontend"
   ],
   "scripts": {
     "build": "turbo run build",

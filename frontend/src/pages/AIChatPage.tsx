@@ -57,7 +57,7 @@ function ChatBubble({ msg }: { msg: ChatMessage }) {
 }
 
 export default function AIChatPage() {
-  const { messages, isLoading, error, addMessage, setLoading, setError, clearMessages } = useChatStore();
+  const { messages, isLoading, addMessage, setLoading, setError, clearMessages } = useChatStore();
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 

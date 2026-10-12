@@ -23,7 +23,8 @@
   "dependencies": {
     "@trackmate/shared": "*",
     "better-sqlite3": "^11.7.0",
-    "drizzle-orm": "^0.36.4"
+    "drizzle-orm": "^0.36.4",
+    "mongoose": "^9.11.1"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",

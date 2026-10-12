@@ -1,8 +1,7 @@
 import { Router } from 'express';
-import { db, tasks } from '@trackmate/database';
-import { eq, and, desc, asc, lt, ne, isNotNull } from 'drizzle-orm';
+import { TaskService, DeadlineService } from '@trackmate/database';
 import { z } from 'zod';
-import { randomUUID } from 'crypto';
+import type { TaskStatus, TaskPriority } from '@trackmate/shared';
 
 export const tasksRouter = Router();
 
@@ -20,107 +19,101 @@ const CreateTaskSchema = z.object({
 
 const UpdateTaskSchema = CreateTaskSchema.omit({ projectId: true }).partial();
 
-function now() { return new Date().toISOString(); }
-function parseTags(raw: string): string[] { try { return JSON.parse(raw); } catch { return []; } }
-
 // GET /api/tasks
 tasksRouter.get('/', async (req, res) => {
   try {
-    const { projectId, status, priority, assigneeId } = req.query as Record<string, string>;
-    const conditions = [];
-    if (projectId)  conditions.push(eq(tasks.projectId, projectId));
-    if (status)     conditions.push(eq(tasks.status, status as 'todo'));
-    if (priority)   conditions.push(eq(tasks.priority, priority as 'low'));
-    if (assigneeId) conditions.push(eq(tasks.assigneeId, assigneeId));
+    const { projectId, status, priority, assigneeId, overdue, dueBefore, dueAfter, limit, offset } =
+      req.query as Record<string, string | undefined>;
 
-    const rows = await db.select().from(tasks)
-      .where(conditions.length > 0 ? and(...conditions) : undefined)
-      .orderBy(desc(tasks.priority), asc(tasks.dueDate));
+    const tasks = await TaskService.getTasks({
+      projectId,
+      status: status as TaskStatus | undefined,
+      priority: priority as TaskPriority | undefined,
+      assigneeId,
+      overdue: overdue === 'true',
+      dueBefore,
+      dueAfter,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+    });
 
-    res.json({ tasks: rows.map(t => ({ ...t, tags: parseTags(t.tags) })) });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+    res.json({ tasks, total: tasks.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? String(err) });
   }
 });
 
 // GET /api/tasks/overdue
-tasksRouter.get('/overdue', async (_req, res) => {
+tasksRouter.get('/overdue', async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0]!;
-    const rows = await db.select().from(tasks)
-      .where(and(isNotNull(tasks.dueDate), lt(tasks.dueDate, today), ne(tasks.status, 'done')));
-    res.json({ tasks: rows.map(t => ({ ...t, tags: parseTags(t.tags) })) });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const projectId = req.query['projectId'] as string | undefined;
+    const tasks = await DeadlineService.getOverdueTasks({ projectId });
+    res.json({ tasks, total: tasks.length });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? String(err) });
   }
 });
 
 // GET /api/tasks/:id
 tasksRouter.get('/:id', async (req, res) => {
   try {
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, req.params['id']!)).limit(1);
-    if (!task) { res.status(404).json({ error: 'Task not found' }); return; }
-    res.json({ task: { ...task, tags: parseTags(task.tags) } });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const task = await TaskService.getTaskById(req.params['id']!);
+    if (!task) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    res.json({ task });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? String(err) });
   }
 });
 
 // POST /api/tasks
 tasksRouter.post('/', async (req, res) => {
   const parsed = CreateTaskSchema.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: parsed.error.errors }); return; }
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors });
+    return;
+  }
 
   try {
-    const id = randomUUID();
-    await db.insert(tasks).values({
-      id,
-      ...parsed.data,
-      description: parsed.data.description ?? null,
-      assigneeId: parsed.data.assigneeId ?? null,
-      dueDate: parsed.data.dueDate ?? null,
-      tags: JSON.stringify(parsed.data.tags),
-      githubIssueUrl: parsed.data.githubIssueUrl ?? null,
-      createdAt: now(),
-      updatedAt: now(),
-    });
-    const [task] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
-    res.status(201).json({ task: task ? { ...task, tags: parseTags(task.tags) } : null });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const task = await TaskService.createTask(parsed.data);
+    res.status(201).json({ task });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? String(err) });
   }
 });
 
 // PATCH /api/tasks/:id
 tasksRouter.patch('/:id', async (req, res) => {
   const parsed = UpdateTaskSchema.safeParse(req.body);
-  if (!parsed.success) { res.status(400).json({ error: parsed.error.errors }); return; }
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.errors });
+    return;
+  }
 
   try {
-    const [existing] = await db.select().from(tasks).where(eq(tasks.id, req.params['id']!)).limit(1);
-    if (!existing) { res.status(404).json({ error: 'Task not found' }); return; }
-
-    const { tags, ...rest } = parsed.data;
-    const updateData: Record<string, unknown> = { ...rest, updatedAt: now() };
-    if (tags !== undefined) updateData['tags'] = JSON.stringify(tags);
-
-    await db.update(tasks).set(updateData).where(eq(tasks.id, req.params['id']!));
-    const [updated] = await db.select().from(tasks).where(eq(tasks.id, req.params['id']!)).limit(1);
-    res.json({ task: updated ? { ...updated, tags: parseTags(updated.tags) } : null });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+    const updated = await TaskService.updateTask(req.params['id']!, parsed.data);
+    if (!updated) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
+    res.json({ task: updated });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? String(err) });
   }
 });
 
 // DELETE /api/tasks/:id
 tasksRouter.delete('/:id', async (req, res) => {
   try {
-    const [existing] = await db.select().from(tasks).where(eq(tasks.id, req.params['id']!)).limit(1);
-    if (!existing) { res.status(404).json({ error: 'Task not found' }); return; }
-
-    await db.delete(tasks).where(eq(tasks.id, req.params['id']!));
+    const success = await TaskService.deleteTask(req.params['id']!);
+    if (!success) {
+      res.status(404).json({ error: 'Task not found' });
+      return;
+    }
     res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ error: String(err) });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message ?? String(err) });
   }
 });

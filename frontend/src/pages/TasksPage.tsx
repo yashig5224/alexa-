@@ -163,6 +163,7 @@ export default function TasksPage() {
               key={task.id}
               task={task}
               onStatusChange={(t, status) => updateMutation.mutate({ id: t.id, data: { status } })}
+              onDelete={(t) => deleteMutation.mutate(t.id)}
             />
           ))}
         </div>

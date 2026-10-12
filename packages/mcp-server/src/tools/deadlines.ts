@@ -1,6 +1,5 @@
 import { z } from 'zod';
-import { db, tasks } from '@trackmate/database';
-import { eq, and, lt, lte, gte, ne, isNotNull } from 'drizzle-orm';
+import { DeadlineService } from '@trackmate/database';
 import type { McpToolResult, McpToolDefinition } from '@trackmate/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -19,16 +18,6 @@ function today(): string {
   return new Date().toISOString().split('T')[0]!;
 }
 
-function daysFromNow(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0]!;
-}
-
-function deserializeTags(raw: string): string[] {
-  try { return JSON.parse(raw) as string[]; } catch { return []; }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool: get_deadlines
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,35 +32,22 @@ export async function get_deadlines(args: Record<string, unknown>): Promise<McpT
   const parsed = GetDeadlinesSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const { projectId, withinDays, includeOverdue } = parsed.data;
-  const cutoff = daysFromNow(withinDays);
-  const todayStr = today();
+  try {
+    const todayStr = today();
+    const rows = await DeadlineService.getDeadlines(parsed.data);
 
-  const conditions = [
-    isNotNull(tasks.dueDate),
-    ne(tasks.status, 'done'),
-    lte(tasks.dueDate, cutoff),
-  ];
+    const enriched = rows.map((t) => ({
+      ...t,
+      isOverdue: t.dueDate ? t.dueDate < todayStr : false,
+      daysUntilDue: t.dueDate
+        ? Math.ceil((new Date(t.dueDate).getTime() - Date.now()) / 86_400_000)
+        : null,
+    }));
 
-  if (!includeOverdue) conditions.push(gte(tasks.dueDate, todayStr));
-  if (projectId) conditions.push(eq(tasks.projectId, projectId));
-
-  const rows = await db
-    .select()
-    .from(tasks)
-    .where(and(...conditions))
-    .orderBy(tasks.dueDate);
-
-  const enriched = rows.map(t => ({
-    ...t,
-    tags: deserializeTags(t.tags),
-    isOverdue: t.dueDate ? t.dueDate < todayStr : false,
-    daysUntilDue: t.dueDate
-      ? Math.ceil((new Date(t.dueDate).getTime() - Date.now()) / 86_400_000)
-      : null,
-  }));
-
-  return jsonResult({ deadlines: enriched, total: enriched.length, asOf: todayStr });
+    return jsonResult({ deadlines: enriched, total: enriched.length, asOf: todayStr });
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to get deadlines');
+  }
 }
 
 export const get_deadlines_definition: McpToolDefinition = {
@@ -99,33 +75,24 @@ export async function get_overdue_tasks(args: Record<string, unknown>): Promise<
   const parsed = GetOverdueSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const todayStr = today();
-  const conditions = [
-    isNotNull(tasks.dueDate),
-    lt(tasks.dueDate, todayStr),
-    ne(tasks.status, 'done'),
-  ];
-  if (parsed.data.projectId) conditions.push(eq(tasks.projectId, parsed.data.projectId));
+  try {
+    const rows = await DeadlineService.getOverdueTasks(parsed.data);
 
-  const rows = await db
-    .select()
-    .from(tasks)
-    .where(and(...conditions))
-    .orderBy(tasks.dueDate);
+    const enriched = rows.map((t) => ({
+      ...t,
+      daysOverdue: t.dueDate
+        ? Math.ceil((Date.now() - new Date(t.dueDate).getTime()) / 86_400_000)
+        : 0,
+    }));
 
-  const enriched = rows.map(t => ({
-    ...t,
-    tags: deserializeTags(t.tags),
-    daysOverdue: t.dueDate
-      ? Math.ceil((Date.now() - new Date(t.dueDate).getTime()) / 86_400_000)
-      : 0,
-  }));
+    const summary = enriched.length === 0
+      ? '✅ No overdue tasks!'
+      : `⚠️ ${enriched.length} overdue task(s) found.`;
 
-  const summary = enriched.length === 0
-    ? '✅ No overdue tasks!'
-    : `⚠️ ${enriched.length} overdue task(s) found.`;
-
-  return jsonResult({ summary, overdueTasks: enriched, total: enriched.length });
+    return jsonResult({ summary, overdueTasks: enriched, total: enriched.length });
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to get overdue tasks');
+  }
 }
 
 export const get_overdue_tasks_definition: McpToolDefinition = {

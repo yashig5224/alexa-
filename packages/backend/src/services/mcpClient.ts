@@ -1,6 +1,8 @@
 import type { McpToolResult, McpToolDefinition } from '@trackmate/shared';
 
-const MCP_SERVER_URL = process.env['MCP_SERVER_URL'] ?? 'http://localhost:3002';
+function getMcpServerUrl(): string {
+  return process.env['MCP_SERVER_URL'] ?? 'http://localhost:3002';
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // MCP HTTP Client
@@ -12,7 +14,7 @@ export class McpClient {
 
   /** Initialize MCP session and return server info */
   async initialize(): Promise<void> {
-    const res = await fetch(`${MCP_SERVER_URL}/mcp`, {
+    const res = await fetch(`${getMcpServerUrl()}/mcp`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -58,7 +60,7 @@ export class McpClient {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.sessionId) headers['Mcp-Session-Id'] = this.sessionId;
 
-    const res = await fetch(`${MCP_SERVER_URL}/mcp`, {
+    const res = await fetch(`${getMcpServerUrl()}/mcp`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ jsonrpc: '2.0', ...body }),

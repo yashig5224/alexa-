@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { tasksApi, projectsApi, type Task, type Project } from '../services/endpoints';
-import { CheckSquare, FolderOpen, AlertTriangle, TrendingUp, Clock } from 'lucide-react';
+import { CheckSquare, FolderOpen, AlertTriangle, TrendingUp, Clock, type LucideIcon } from 'lucide-react';
 import TaskCard from '../components/TaskCard';
 import { Link } from 'react-router-dom';
 
@@ -8,7 +8,7 @@ import { Link } from 'react-router-dom';
 function StatCard({ label, value, icon: Icon, accent }: {
   label: string;
   value: number | string;
-  icon: React.FC<{ size?: number }>;
+  icon: LucideIcon;
   accent?: string;
 }) {
   return (

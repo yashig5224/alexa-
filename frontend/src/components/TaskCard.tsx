@@ -1,11 +1,12 @@
 import type { Task } from '../services/endpoints';
 import { formatDistanceToNow } from 'date-fns';
-import { Circle, Clock, AlertTriangle } from 'lucide-react';
+import { Circle, Clock, AlertTriangle, Trash2 } from 'lucide-react';
 
 interface Props {
   task: Task;
   onClick?: (task: Task) => void;
   onStatusChange?: (task: Task, status: Task['status']) => void;
+  onDelete?: (task: Task) => void;
 }
 
 const STATUS_ICONS: Record<Task['status'], JSX.Element> = {
@@ -15,7 +16,7 @@ const STATUS_ICONS: Record<Task['status'], JSX.Element> = {
   blocked:     <AlertTriangle size={14} style={{ color: 'var(--danger)' }} />,
 };
 
-export default function TaskCard({ task, onClick, onStatusChange }: Props) {
+export default function TaskCard({ task, onClick, onStatusChange, onDelete }: Props) {
   const isOverdue =
     task.dueDate && task.status !== 'done' && new Date(task.dueDate) < new Date();
 
@@ -102,6 +103,20 @@ export default function TaskCard({ task, onClick, onStatusChange }: Props) {
             )}
           </div>
         </div>
+
+        {onDelete && (
+          <button
+            className="btn-ghost btn-icon"
+            onClick={(e) => {
+              e.stopPropagation();
+              onDelete(task);
+            }}
+            title="Delete task"
+            style={{ color: 'var(--text-muted)', opacity: 0.7 }}
+          >
+            <Trash2 size={13} />
+          </button>
+        )}
       </div>
     </div>
   );

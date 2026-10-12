@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import express from 'express';
 import { mcpRouter } from '../../src/mcpHandler.js';
+import { connectMongoDB, disconnectMongoDB, SeedService } from '@trackmate/database';
 import type { AddressInfo } from 'net';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -15,6 +16,9 @@ app.use(express.json());
 app.use('/mcp', mcpRouter);
 
 beforeAll(async () => {
+  await connectMongoDB();
+  await SeedService.seedMongoDB();
+
   await new Promise<void>(resolve => {
     server = app.listen(0, () => {
       const addr = server.address() as AddressInfo;
@@ -24,8 +28,11 @@ beforeAll(async () => {
   });
 });
 
-afterAll(() => {
-  server.close();
+afterAll(async () => {
+  await new Promise<void>(resolve => {
+    server.close(() => resolve());
+  });
+  await disconnectMongoDB();
 });
 
 async function mcpPost(body: unknown, headers: Record<string, string> = {}) {

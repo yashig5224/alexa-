@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
 import TasksPage    from './pages/TasksPage';
 import ProjectsPage from './pages/ProjectsPage';
+import ProjectDetailPage from './pages/ProjectDetailPage';
 import TeamPage     from './pages/TeamPage';
 import AIChatPage   from './pages/AIChatPage';
 
@@ -33,12 +34,13 @@ export default function App() {
           <Sidebar />
           <main className="main-content">
             <Routes>
-              <Route path="/"          element={<DashboardPage />} />
-              <Route path="/projects"  element={<ProjectsPage />}  />
-              <Route path="/tasks"     element={<TasksPage />}     />
-              <Route path="/team"      element={<TeamPage />}      />
-              <Route path="/ai"        element={<AIChatPage />}    />
-              <Route path="*"          element={<NotFound />}      />
+              <Route path="/"              element={<DashboardPage />} />
+              <Route path="/projects"      element={<ProjectsPage />}  />
+              <Route path="/projects/:id"  element={<ProjectDetailPage />} />
+              <Route path="/tasks"         element={<TasksPage />}     />
+              <Route path="/team"          element={<TeamPage />}      />
+              <Route path="/ai"            element={<AIChatPage />}    />
+              <Route path="*"              element={<NotFound />}      />
             </Routes>
           </main>
         </div>

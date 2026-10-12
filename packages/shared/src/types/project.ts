@@ -29,16 +29,16 @@ export interface ProjectProgress {
 
 export interface CreateProjectInput {
   name: string;
-  description?: string;
-  status?: ProjectStatus;
-  githubRepo?: string;
-  color?: string;
+  description?: string | null | undefined;
+  status?: ProjectStatus | undefined;
+  githubRepo?: string | null | undefined;
+  color?: string | undefined;
 }
 
 export interface UpdateProjectInput {
-  name?: string;
-  description?: string;
-  status?: ProjectStatus;
-  githubRepo?: string;
-  color?: string;
+  name?: string | undefined;
+  description?: string | null | undefined;
+  status?: ProjectStatus | undefined;
+  githubRepo?: string | null | undefined;
+  color?: string | undefined;
 }

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { connectMongoDB, SeedService } from '@trackmate/database';
 import { mcpRouter } from './mcpHandler.js';
 
 const PORT = parseInt(process.env['MCP_PORT'] ?? '3002', 10);
@@ -51,12 +52,25 @@ app.use((_req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// ── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 TrackMate MCP Server running on http://localhost:${PORT}`);
-  console.log(`   Transport: Streamable HTTP (MCP spec 2025-11-25)`);
-  console.log(`   Endpoint:  POST http://localhost:${PORT}/mcp`);
-  console.log(`   Health:    GET  http://localhost:${PORT}/health`);
-});
+// ── Start server & DB connection ─────────────────────────────────────────────
+async function start() {
+  try {
+    await connectMongoDB();
+    await SeedService.seedMongoDB();
+  } catch (err) {
+    console.warn('⚠️ MongoDB connection/seeding warning:', err);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 TrackMate MCP Server running on http://localhost:${PORT}`);
+    console.log(`   Transport: Streamable HTTP (MCP spec 2025-11-25)`);
+    console.log(`   Endpoint:  POST http://localhost:${PORT}/mcp`);
+    console.log(`   Health:    GET  http://localhost:${PORT}/health`);
+  });
+}
+
+if (process.env['NODE_ENV'] !== 'test') {
+  start();
+}
 
 export { app };

@@ -41,6 +41,19 @@ export interface User {
   role: 'owner' | 'member' | 'viewer';
 }
 
+export interface GitHubIssue {
+  id: number;
+  number: number;
+  title: string;
+  state: 'open' | 'closed';
+  url: string;
+  labels: string[];
+  assignees: string[];
+  createdAt: string;
+  updatedAt: string;
+  body: string | null;
+}
+
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
@@ -58,6 +71,14 @@ export const projectsApi = {
   update: (id: string, data: Partial<Project>) =>
     api.patch<{ project: Project }>(`/projects/${id}`, data).then((r) => r.data.project),
   delete: (id: string) => api.delete(`/projects/${id}`),
+  getTasks: (id: string) =>
+    api.get<{ tasks: Task[] }>(`/projects/${id}/tasks`).then((r) => r.data.tasks),
+  getGithubIssues: (id: string) =>
+    api.get<{ issues: GitHubIssue[]; repository: string; total: number; source?: string }>(`/projects/${id}/github-issues`).then((r) => r.data),
+  convertIssue: (id: string, data: { title: string; description?: string; issueNumber?: number; issueUrl?: string; priority?: string }) =>
+    api.post<{ task: Task }>(`/projects/${id}/convert-issue`, data).then((r) => r.data.task),
+  summarize: (id: string) =>
+    api.post<{ summary: string }>(`/projects/${id}/summarize`).then((r) => r.data.summary),
 };
 
 /* ── Task endpoints ────────────────────────────────────────── */

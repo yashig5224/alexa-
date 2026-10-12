@@ -2,11 +2,14 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import rateLimit from 'express-rate-limit';
+import { connectMongoDB, SeedService } from '@trackmate/database';
 
-import { projectsRouter } from './routes/projects.js';
-import { tasksRouter }    from './routes/tasks.js';
-import { usersRouter }    from './routes/users.js';
-import { aiRouter }       from './routes/ai.js';
+import { projectsRouter }   from './routes/projects.js';
+import { tasksRouter }      from './routes/tasks.js';
+import { usersRouter }      from './routes/users.js';
+import { deadlinesRouter }  from './routes/deadlines.js';
+import { prioritiesRouter } from './routes/priorities.js';
+import { aiRouter }         from './routes/ai.js';
 
 const PORT        = parseInt(process.env['PORT'] ?? '3001', 10);
 const CORS_ORIGIN = process.env['CORS_ORIGIN'] ?? 'http://localhost:5173';
@@ -15,16 +18,16 @@ const app = express();
 
 // ── CORS ─────────────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: CORS_ORIGIN,
+  origin: [CORS_ORIGIN, 'http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'],
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
   credentials: true,
 }));
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
 const apiLimiter = rateLimit({
   windowMs: parseInt(process.env['RATE_LIMIT_WINDOW_MS'] ?? '900000', 10),
-  max:      parseInt(process.env['RATE_LIMIT_MAX'] ?? '100', 10),
+  max:      parseInt(process.env['RATE_LIMIT_MAX'] ?? '200', 10),
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -33,7 +36,7 @@ app.use('/api/', apiLimiter);
 // AI endpoint gets stricter limiting
 const aiLimiter = rateLimit({
   windowMs: 60_000, // 1 minute
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'AI rate limit exceeded. Please wait before sending more messages.' },
@@ -48,6 +51,7 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     service: 'trackmate-backend',
     version: '1.0.0',
+    database: 'MongoDB',
     aiProvider: process.env['AI_PROVIDER'] ?? 'mock',
     mcpServerUrl: process.env['MCP_SERVER_URL'] ?? 'http://localhost:3002',
     timestamp: new Date().toISOString(),
@@ -55,10 +59,12 @@ app.get('/health', (_req, res) => {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
-app.use('/api/projects', projectsRouter);
-app.use('/api/tasks',    tasksRouter);
-app.use('/api/users',    usersRouter);
-app.use('/api/ai',       aiLimiter, aiRouter);
+app.use('/api/projects',   projectsRouter);
+app.use('/api/tasks',      tasksRouter);
+app.use('/api/users',      usersRouter);
+app.use('/api/deadlines',  deadlinesRouter);
+app.use('/api/priorities', prioritiesRouter);
+app.use('/api/ai',         aiLimiter, aiRouter);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {
@@ -71,11 +77,24 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   res.status(500).json({ error: 'Internal server error' });
 });
 
-// ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`🚀 TrackMate Backend running on http://localhost:${PORT}`);
-  console.log(`   AI Provider: ${process.env['AI_PROVIDER'] ?? 'mock'}`);
-  console.log(`   MCP Server:  ${process.env['MCP_SERVER_URL'] ?? 'http://localhost:3002'}`);
-});
+// ── Start server & DB connection ─────────────────────────────────────────────
+async function start() {
+  try {
+    await connectMongoDB();
+    await SeedService.seedMongoDB();
+  } catch (err) {
+    console.warn('⚠️ MongoDB connection/seeding warning:', err);
+  }
+
+  app.listen(PORT, () => {
+    console.log(`🚀 TrackMate Backend running on http://localhost:${PORT}`);
+    console.log(`   AI Provider: ${process.env['AI_PROVIDER'] ?? 'mock'}`);
+    console.log(`   MCP Server:  ${process.env['MCP_SERVER_URL'] ?? 'http://localhost:3002'}`);
+  });
+}
+
+if (process.env['NODE_ENV'] !== 'test') {
+  start();
+}
 
 export { app };

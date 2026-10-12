@@ -22,35 +22,35 @@ export interface Task {
 
 export interface CreateTaskInput {
   title: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
+  description?: string | null | undefined;
+  status?: TaskStatus | undefined;
+  priority?: TaskPriority | undefined;
   projectId: string;
-  assigneeId?: string;
-  dueDate?: string;
-  tags?: string[];
-  githubIssueUrl?: string;
+  assigneeId?: string | null | undefined;
+  dueDate?: string | null | undefined;
+  tags?: string[] | undefined;
+  githubIssueUrl?: string | null | undefined;
 }
 
 export interface UpdateTaskInput {
-  title?: string;
-  description?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  assigneeId?: string;
-  dueDate?: string;
-  tags?: string[];
-  githubIssueUrl?: string;
+  title?: string | undefined;
+  description?: string | null | undefined;
+  status?: TaskStatus | undefined;
+  priority?: TaskPriority | undefined;
+  assigneeId?: string | null | undefined;
+  dueDate?: string | null | undefined;
+  tags?: string[] | undefined;
+  githubIssueUrl?: string | null | undefined;
 }
 
 export interface TaskFilters {
-  projectId?: string;
-  status?: TaskStatus;
-  priority?: TaskPriority;
-  assigneeId?: string;
-  overdue?: boolean;
-  dueBefore?: string;
-  dueAfter?: string;
-  limit?: number;
-  offset?: number;
+  projectId?: string | undefined;
+  status?: TaskStatus | undefined;
+  priority?: TaskPriority | undefined;
+  assigneeId?: string | undefined;
+  overdue?: boolean | undefined;
+  dueBefore?: string | undefined;
+  dueAfter?: string | undefined;
+  limit?: number | undefined;
+  offset?: number | undefined;
 }

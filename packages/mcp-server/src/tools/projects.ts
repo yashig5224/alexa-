@@ -1,7 +1,6 @@
 import { z } from 'zod';
-import { db, projects, tasks, projectMembers, users } from '@trackmate/database';
-import { eq, and, count, sql } from 'drizzle-orm';
-import type { McpToolResult, McpToolDefinition, ProjectProgress } from '@trackmate/shared';
+import { ProjectService } from '@trackmate/database';
+import type { McpToolResult, McpToolDefinition } from '@trackmate/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -28,14 +27,12 @@ export async function get_projects(args: Record<string, unknown>): Promise<McpTo
   const parsed = GetProjectsSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const { status, limit } = parsed.data;
-  const rows = await db
-    .select()
-    .from(projects)
-    .where(status ? eq(projects.status, status) : undefined)
-    .limit(limit);
-
-  return jsonResult({ projects: rows, total: rows.length });
+  try {
+    const projects = await ProjectService.getProjects(parsed.data);
+    return jsonResult({ projects, total: projects.length });
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to get projects');
+  }
 }
 
 export const get_projects_definition: McpToolDefinition = {
@@ -62,45 +59,13 @@ export async function get_project_status(args: Record<string, unknown>): Promise
   const parsed = GetProjectStatusSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const [project] = await db
-    .select()
-    .from(projects)
-    .where(eq(projects.id, parsed.data.projectId))
-    .limit(1);
-
-  if (!project) return errorResult(`Project "${parsed.data.projectId}" not found`);
-
-  const allTasks = await db
-    .select()
-    .from(tasks)
-    .where(eq(tasks.projectId, parsed.data.projectId));
-
-  const today = new Date().toISOString().split('T')[0]!;
-
-  const completedTasks   = allTasks.filter(t => t.status === 'done').length;
-  const inProgressTasks  = allTasks.filter(t => t.status === 'in_progress').length;
-  const blockedTasks     = allTasks.filter(t => t.status === 'blocked');
-  const overdueTasks     = allTasks.filter(t => t.dueDate && t.dueDate < today && t.status !== 'done').length;
-  const completionPct    = allTasks.length > 0
-    ? Math.round((completedTasks / allTasks.length) * 100)
-    : 0;
-
-  const progress: ProjectProgress = {
-    project: {
-      ...project,
-      description: project.description ?? null,
-      githubRepo: project.githubRepo ?? null,
-    },
-    totalTasks:           allTasks.length,
-    completedTasks,
-    inProgressTasks,
-    blockedTasks:         blockedTasks.length,
-    overdueTasks,
-    completionPercentage: completionPct,
-    blockers:             blockedTasks.map(t => t.title),
-  };
-
-  return jsonResult(progress);
+  try {
+    const progress = await ProjectService.getProjectStatus(parsed.data.projectId);
+    if (!progress) return errorResult(`Project "${parsed.data.projectId}" not found`);
+    return jsonResult(progress);
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to get project status');
+  }
 }
 
 export const get_project_status_definition: McpToolDefinition = {

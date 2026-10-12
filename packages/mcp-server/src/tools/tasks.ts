@@ -1,7 +1,5 @@
 import { z } from 'zod';
-import { db, tasks, projects } from '@trackmate/database';
-import { eq, and, lt, gte, isNull, or, desc, asc } from 'drizzle-orm';
-import { randomUUID } from 'crypto';
+import { TaskService, ProjectService } from '@trackmate/database';
 import type { McpToolResult, McpToolDefinition } from '@trackmate/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -65,10 +63,6 @@ function errorResult(message: string): McpToolResult {
   return { content: [{ type: 'text', text: `Error: ${message}` }], isError: true };
 }
 
-function deserializeTags(raw: string): string[] {
-  try { return JSON.parse(raw) as string[]; } catch { return []; }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Tool: get_tasks
 // ─────────────────────────────────────────────────────────────────────────────
@@ -77,24 +71,12 @@ export async function get_tasks(args: Record<string, unknown>): Promise<McpToolR
   const parsed = GetTasksSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const { projectId, status, priority, assigneeId, limit, offset } = parsed.data;
-
-  const conditions = [];
-  if (projectId)  conditions.push(eq(tasks.projectId, projectId));
-  if (status)     conditions.push(eq(tasks.status, status));
-  if (priority)   conditions.push(eq(tasks.priority, priority));
-  if (assigneeId) conditions.push(eq(tasks.assigneeId, assigneeId));
-
-  const rows = await db
-    .select()
-    .from(tasks)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .orderBy(desc(tasks.priority), asc(tasks.dueDate))
-    .limit(limit)
-    .offset(offset);
-
-  const result = rows.map(r => ({ ...r, tags: deserializeTags(r.tags) }));
-  return jsonResult({ tasks: result, total: result.length });
+  try {
+    const tasks = await TaskService.getTasks(parsed.data);
+    return jsonResult({ tasks, total: tasks.length });
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to get tasks');
+  }
 }
 
 export const get_tasks_definition: McpToolDefinition = {
@@ -121,10 +103,13 @@ export async function get_task(args: Record<string, unknown>): Promise<McpToolRe
   const parsed = GetTaskSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const [task] = await db.select().from(tasks).where(eq(tasks.id, parsed.data.id)).limit(1);
-  if (!task) return errorResult(`Task with id "${parsed.data.id}" not found`);
-
-  return jsonResult({ ...task, tags: deserializeTags(task.tags) });
+  try {
+    const task = await TaskService.getTaskById(parsed.data.id);
+    if (!task) return errorResult(`Task with id "${parsed.data.id}" not found`);
+    return jsonResult(task);
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to get task');
+  }
 }
 
 export const get_task_definition: McpToolDefinition = {
@@ -147,29 +132,18 @@ export async function create_task(args: Record<string, unknown>): Promise<McpToo
   const parsed = CreateTaskSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  // Verify project exists
-  const [project] = await db.select().from(projects).where(eq(projects.id, parsed.data.projectId)).limit(1);
-  if (!project) return errorResult(`Project "${parsed.data.projectId}" not found`);
+  try {
+    const project = await ProjectService.getProjectById(parsed.data.projectId);
+    if (!project) return errorResult(`Project "${parsed.data.projectId}" not found`);
 
-  const id = randomUUID();
-  const nowStr = new Date().toISOString();
+    const task = await TaskService.createTask(parsed.data);
 
-  await db.insert(tasks).values({
-    id,
-    title:          parsed.data.title,
-    description:    parsed.data.description ?? null,
-    status:         parsed.data.status,
-    priority:       parsed.data.priority,
-    projectId:      parsed.data.projectId,
-    assigneeId:     parsed.data.assigneeId ?? null,
-    dueDate:        parsed.data.dueDate ?? null,
-    tags:           JSON.stringify(parsed.data.tags),
-    githubIssueUrl: parsed.data.githubIssueUrl ?? null,
-    createdAt:      nowStr,
-    updatedAt:      nowStr,
-  });
-
-  return textResult(`✅ Task created successfully!\nID: ${id}\nTitle: ${parsed.data.title}\nPriority: ${parsed.data.priority}\nDue: ${parsed.data.dueDate ?? 'No deadline'}`);
+    return textResult(
+      `✅ Task created successfully!\nID: ${task.id}\nTitle: ${task.title}\nPriority: ${task.priority}\nDue: ${task.dueDate ?? 'No deadline'}`
+    );
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to create task');
+  }
 }
 
 export const create_task_definition: McpToolDefinition = {
@@ -200,20 +174,17 @@ export async function update_task(args: Record<string, unknown>): Promise<McpToo
   const parsed = UpdateTaskSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const { id, tags, ...updates } = parsed.data;
+  const { id, ...updates } = parsed.data;
 
-  const [existing] = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
-  if (!existing) return errorResult(`Task "${id}" not found`);
+  try {
+    const existing = await TaskService.getTaskById(id);
+    if (!existing) return errorResult(`Task "${id}" not found`);
 
-  const updateData: Record<string, unknown> = {
-    ...updates,
-    updatedAt: new Date().toISOString(),
-  };
-  if (tags !== undefined) updateData['tags'] = JSON.stringify(tags);
-
-  await db.update(tasks).set(updateData).where(eq(tasks.id, id));
-
-  return textResult(`✅ Task "${existing.title}" updated successfully.`);
+    await TaskService.updateTask(id, updates);
+    return textResult(`✅ Task "${existing.title}" updated successfully.`);
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to update task');
+  }
 }
 
 export const update_task_definition: McpToolDefinition = {
@@ -244,11 +215,15 @@ export async function delete_task(args: Record<string, unknown>): Promise<McpToo
   const parsed = DeleteTaskSchema.safeParse(args);
   if (!parsed.success) return errorResult(parsed.error.message);
 
-  const [existing] = await db.select().from(tasks).where(eq(tasks.id, parsed.data.id)).limit(1);
-  if (!existing) return errorResult(`Task "${parsed.data.id}" not found`);
+  try {
+    const existing = await TaskService.getTaskById(parsed.data.id);
+    if (!existing) return errorResult(`Task "${parsed.data.id}" not found`);
 
-  await db.delete(tasks).where(eq(tasks.id, parsed.data.id));
-  return textResult(`🗑️ Task "${existing.title}" deleted.`);
+    await TaskService.deleteTask(parsed.data.id);
+    return textResult(`🗑️ Task "${existing.title}" deleted.`);
+  } catch (err: any) {
+    return errorResult(err.message ?? 'Failed to delete task');
+  }
 }
 
 export const delete_task_definition: McpToolDefinition = {
