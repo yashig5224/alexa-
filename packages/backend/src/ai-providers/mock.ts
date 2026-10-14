@@ -43,10 +43,10 @@ export class MockProvider implements AIProvider {
 
     // 2. Direct conversational answer when no tool is needed
     return {
-      text: `Hello! I'm TrackMate AI, your agentic project management assistant. You can ask me questions or command actions such as:\n` +
+      text: `Hello! I'm QLYQ (formerly TrackMate AI), your MCP-powered AI project and developer assistant. Think less. Ship more. You can ask me questions or command actions such as:\n` +
         `• "What should I work on today?"\n` +
         `• "Show my overdue tasks."\n` +
-        `• "What is blocking TrackMate AI?"\n` +
+        `• "What is blocking QLYQ?"\n` +
         `• "Create a task to finish the API tomorrow."\n` +
         `• "Move the authentication task to in progress."\n` +
         `• "Summarize my project."`,

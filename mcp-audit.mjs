@@ -78,7 +78,7 @@ try {
   bad('ping', String(e));
 }
 
-// ── CHECK 3: tools/list — discover all 12 tools ───────────────────────────────
+// ── CHECK 3: tools/list — discover all 15 tools ───────────────────────────────
 console.log('\n[CHECK 3] tools/list — tool discovery');
 let tools = [];
 try {
@@ -88,8 +88,8 @@ try {
   else bad('HTTP status', res.status);
   if (Array.isArray(tools)) ok(`tools array returned`);
   else bad('tools is not array');
-  if (tools.length === 12) ok(`12 tools registered`);
-  else bad(`tool count`, `got ${tools.length}, expected 12`);
+  if (tools.length === 15) ok(`15 tools registered`);
+  else bad(`tool count`, `got ${tools.length}, expected 15`);
   const names = tools.map(t => t.name);
   const required = ['get_tasks', 'create_task', 'update_task', 'delete_task', 'get_projects', 'get_daily_priorities', 'get_overdue_tasks'];
   for (const r of required) {

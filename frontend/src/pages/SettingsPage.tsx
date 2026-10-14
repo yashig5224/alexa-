@@ -149,7 +149,7 @@ export default function SettingsPage() {
           </div>
           <div className="space-y-1">
             <span className="text-text-muted block text-[11px] uppercase font-semibold">Workspace</span>
-            <div className="font-medium text-white text-sm">TrackMate Engineering</div>
+            <div className="font-medium text-white text-sm">QLYQ Engineering</div>
             <div className="text-text-muted">3 active projects · 9 tasks</div>
           </div>
         </div>
@@ -166,7 +166,7 @@ export default function SettingsPage() {
         </div>
 
         <p className="text-xs text-text-muted">
-          These tools are registered with the self-hosted Streamable HTTP MCP Server and can be executed dynamically by Bedrock and the TrackMate AI Agent.
+          These tools are registered with the self-hosted Streamable HTTP MCP Server and can be executed dynamically by Bedrock and the QLYQ AI Agent.
         </p>
 
         <div className="divide-y divide-border/60">

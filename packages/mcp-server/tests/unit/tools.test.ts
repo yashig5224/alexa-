@@ -29,12 +29,12 @@ describe('MCP Tool Schemas (unit)', () => {
     expect(schema.required).toContain('projectId');
   });
 
-  it('TOOL_DEFINITIONS contains exactly 12 tools', async () => {
+  it('TOOL_DEFINITIONS contains exactly 15 tools', async () => {
     const { TOOL_DEFINITIONS } = await import('../../src/tools/index.js');
-    expect(TOOL_DEFINITIONS).toHaveLength(12);
+    expect(TOOL_DEFINITIONS).toHaveLength(15);
   });
 
-  it('ALL_TOOLS registry contains all 12 tool names', async () => {
+  it('ALL_TOOLS registry contains all 15 tool names', async () => {
     const { ALL_TOOLS } = await import('../../src/tools/index.js');
     const expected = [
       'get_tasks', 'get_task', 'create_task', 'update_task', 'delete_task',
@@ -42,6 +42,9 @@ describe('MCP Tool Schemas (unit)', () => {
       'get_deadlines', 'get_overdue_tasks',
       'get_daily_priorities',
       'get_github_issues',
+      'get_github_pull_requests',
+      'get_stale_github_issues',
+      'summarize_github_activity',
       'summarize_project',
     ];
     expected.forEach(name => {

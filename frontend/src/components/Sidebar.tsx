@@ -9,8 +9,9 @@ import {
   Github,
   Users,
   Settings,
-  Zap,
 } from 'lucide-react';
+
+import QlyqLogo from './QlyqLogo';
 
 const mainNavItems = [
   { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
@@ -26,14 +27,9 @@ export default function Sidebar() {
   return (
     <aside className="sidebar flex flex-col justify-between h-full w-60 border-r border-border bg-surface-card shrink-0">
       <div>
-        {/* Logo */}
-        <div className="sidebar-logo flex items-center gap-2.5 px-5 py-5 border-b border-border/60">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
-            <Zap size={16} className="text-white fill-white" />
-          </div>
-          <div className="text-base font-bold tracking-tight text-white">
-            Track<span className="text-indigo-400">Mate</span>
-          </div>
+        {/* QLYQ Typographic Wordmark & Ribbon Symbol */}
+        <div className="sidebar-logo flex items-center justify-between px-5 py-5 border-b border-border/60">
+          <QlyqLogo variant="horizontal" size={32} showTagline={true} />
         </div>
 
         {/* Main navigation */}

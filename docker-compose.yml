@@ -1,6 +1,23 @@
 version: '3.8'
 
 services:
+  # ── MongoDB Database ────────────────────────────────────────────────────────
+  mongodb:
+    image: mongo:7-jammy
+    container_name: trackmate-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ── MCP Server (Port 3002) ──────────────────────────────────────────────────
   mcp-server:
     build:
       context: .
@@ -10,19 +27,22 @@ services:
     ports:
       - "3002:3002"
     environment:
-      - PORT=3002
-      - DATABASE_URL=/app/data/dev.db
-      - GITHUB_DEFAULT_OWNER=alexchen
-      - GITHUB_DEFAULT_REPO=trackmate-ai
-    volumes:
-      - ./dev.db:/app/data/dev.db
+      - MCP_PORT=3002
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/trackmate}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_DEFAULT_OWNER=${GITHUB_DEFAULT_OWNER:-}
+      - GITHUB_DEFAULT_REPO=${GITHUB_DEFAULT_REPO:-}
+    depends_on:
+      mongodb:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3002/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 10s
 
+  # ── Backend API & AI Agent Gateway (Port 3001) ──────────────────────────────
   backend:
     build:
       context: .
@@ -33,26 +53,32 @@ services:
       - "3001:3001"
     environment:
       - PORT=3001
-      - DATABASE_URL=/app/data/dev.db
+      - MONGODB_URI=${MONGODB_URI:-mongodb://mongodb:27017/trackmate}
       - MCP_SERVER_URL=http://mcp-server:3002
       - AI_PROVIDER=${AI_PROVIDER:-mock}
       - AWS_REGION=${AWS_REGION:-us-east-1}
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID:-}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY:-}
       - BEDROCK_MODEL_ID=${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_DEFAULT_OWNER=${GITHUB_DEFAULT_OWNER:-}
+      - GITHUB_DEFAULT_REPO=${GITHUB_DEFAULT_REPO:-}
       - CORS_ORIGIN=http://localhost:5173
-    volumes:
-      - ./dev.db:/app/data/dev.db
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-200}
     depends_on:
+      mongodb:
+        condition: service_healthy
       mcp-server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:3001/health"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 5s
+      start_period: 10s
 
+  # ── Frontend Web Dashboard (Port 5173) ──────────────────────────────────────
   frontend:
     build:
       context: .
@@ -64,6 +90,13 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
 volumes:
-  db-data:
+  mongodb-data:
+    name: trackmate_mongodb_data

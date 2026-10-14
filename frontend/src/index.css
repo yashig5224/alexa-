@@ -16,17 +16,25 @@
 /* ── CSS Custom Properties ──────────────────────────────────── */
 :root {
   /* Backgrounds */
-  --bg-base:       #090c14;
-  --bg-surface:    #0f1520;
-  --bg-elevated:   #151d2e;
-  --bg-hover:      #1c2640;
-  --bg-glass:      rgba(21, 29, 46, 0.65);
+  --bg-base:       #0B0B14;
+  --bg-surface:    #11111E;
+  --bg-elevated:   #17172A;
+  --bg-hover:      #1E1E38;
+  --bg-glass:      rgba(17, 17, 30, 0.75);
 
-  /* Accent – electric violet/blue gradient system */
-  --accent-1:      #6c63ff;
-  --accent-2:      #3b8bff;
-  --accent-grad:   linear-gradient(135deg, #6c63ff 0%, #3b8bff 100%);
-  --accent-glow:   0 0 24px rgba(108, 99, 255, 0.35);
+  /* QLYQ Signature Palette */
+  --qlyq-lavender: #A78BFA;
+  --qlyq-violet:   #7C3AED;
+  --qlyq-blue:     #60A5FA;
+  --qlyq-mist:     #EDE9FE;
+  --qlyq-charcoal: #0B0B14;
+  --qlyq-silver:   #E2E8F0;
+
+  /* Accent – refined violet/lavender/blue gradient system */
+  --accent-1:      #7C3AED;
+  --accent-2:      #A78BFA;
+  --accent-grad:   linear-gradient(135deg, #7C3AED 0%, #A78BFA 50%, #60A5FA 100%);
+  --accent-glow:   0 0 24px rgba(167, 139, 250, 0.35);
 
   /* Semantic colours */
   --success:       #22d3a5;

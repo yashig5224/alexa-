@@ -1,6 +1,7 @@
-# 🚀 TrackMate AI
+# 🚀 QLYQ
 
-> **Agentic Productivity & Project Management Platform**  
+> **MCP-Powered AI Project and Developer Assistant**  
+> *Think less. Ship more.*  
 > *Built for the Amazon Developer Hackathon 2026*  
 > **Primary Track: Alexa+** | **Mini Challenges: AWS Builder · Open Source**
 
@@ -16,9 +17,9 @@
 
 ## 💡 Overview
 
-**TrackMate AI** is an intelligent, agentic productivity platform that pairs developers and students with an autonomous assistant capable of orchestrating real software projects.
+**QLYQ** is an AI-powered productivity and developer assistant that coordinates tasks, project priorities, and GitHub workflows through an agentic architecture using the Model Context Protocol (MCP).
 
-Unlike passive chat interfaces, TrackMate AI features a **self-hosted Model Context Protocol (MCP) server** implementing the **2025-11-25 specification** over **Streamable HTTP**. The assistant reasons about tasks, deadlines, and blockers, and autonomously executes tools—creating tasks, computing daily priorities, investigating blocked projects, and syncing GitHub issues.
+**Think less. Ship more.** Unlike passive chat interfaces, QLYQ features a **self-hosted Model Context Protocol (MCP) server** implementing the **2025-11-25 specification** over **Streamable HTTP**. The assistant reasons about tasks, deadlines, and blockers, and autonomously executes tools—creating tasks, computing daily priorities, investigating blocked projects, and syncing GitHub issues and PRs.
 
 ---
 
@@ -26,7 +27,7 @@ Unlike passive chat interfaces, TrackMate AI features a **self-hosted Model Cont
 
 ### 1. Primary Track: Alexa+
 - **Self-Hosted MCP Server**: Implements the official **MCP specification 2025-11-25** using **Streamable HTTP** (`POST /mcp`).
-- **Autonomous Tool Execution**: Exposes **12 production-grade MCP tools** (tasks, projects, deadlines, priorities, GitHub issues, and AI summaries).
+- **Autonomous Tool Execution**: Exposes **15 production-grade MCP tools** (tasks, projects, deadlines, priorities, GitHub issues, pull requests, stale work, and AI summaries).
 - **Session Management**: Full `Mcp-Session-Id` header tracking and chunked streaming / Server-Sent Events (SSE) support for real-time tool results.
 - **Audited Compliance**: Zero-defect automated test suite (`node mcp-audit.mjs`) verifying all 37 protocol checks.
 
@@ -100,29 +101,57 @@ Unlike passive chat interfaces, TrackMate AI features a **self-hosted Model Cont
 | 9 | `get_daily_priorities` | Calculate weighted urgency scores for today's tasks |
 | 10 | `get_overdue_tasks` | Identify overdue tasks requiring immediate attention |
 | 11 | `get_github_issues` | Fetch open/closed issues from a linked GitHub repo |
-| 12 | `summarize_project` | Synthesize an AI-powered executive project status summary |
+| 12 | `get_github_pull_requests` | Fetch open pull requests, reviewers, and draft status |
+| 13 | `get_stale_github_issues` | Identify issues with no updates past a staleness threshold |
+| 14 | `summarize_github_activity` | Generate pulse summary of repository issues, PRs, and health |
+| 15 | `summarize_project` | Synthesize an AI-powered executive project status summary |
 
 ---
 
-## ⚡ Quickstart
+## ⚡ Quickstart & Deployment
 
 ### Option A: One-Command Docker Compose (Recommended)
 
+Run all services in isolated, production-ready containers with a single command:
+
 ```bash
-docker compose up --build
+docker compose up --build -d
 ```
 
-- **Frontend**: http://localhost:5173
-- **Backend API**: http://localhost:3001
-- **MCP Server**: http://localhost:3002
+- **Frontend SPA (Nginx)**: http://localhost:5173
+- **Backend API Gateway**: http://localhost:3001
+- **MCP Server (Streamable HTTP)**: http://localhost:3002
+- **MongoDB Database**: `mongodb://localhost:27017`
+
+#### Managing Docker Containers
+
+```bash
+# View combined live logs across all containers
+docker compose logs -f
+
+# View logs for a specific service
+docker compose logs -f backend
+docker compose logs -f mcp-server
+docker compose logs -f frontend
+
+# Rebuild containers after code modifications
+docker compose up --build -d
+
+# Stop all services (preserves database data via named volume)
+docker compose down
+
+# Stop and wipe database data (clean reset)
+docker compose down -v
+```
 
 ---
 
-### Option B: Local Development
+### Option B: Local Development (Without Docker)
 
 #### Prerequisites
 - Node.js 20+
 - npm 10+
+- MongoDB 6.0+ (running locally on port 27017 or remote URI)
 
 #### 1. Install Dependencies
 ```bash
@@ -133,18 +162,29 @@ npm install
 ```bash
 cp .env.example .env
 ```
-*(Default settings run with SQLite and the built-in offline mock provider. To use AWS Bedrock, add your AWS credentials and set `AI_PROVIDER=bedrock`)*.
+*(Default settings run with local MongoDB and the built-in offline mock provider. To use AWS Bedrock, add your AWS credentials and set `AI_PROVIDER=bedrock`)*.
 
 #### 3. Build & Run Services
 ```bash
-# In Terminal 1: Start MCP Server
-npm run dev --workspace=@trackmate/mcp-server
+# Build all packages in monorepo
+npm run build
 
-# In Terminal 2: Start Backend API
-npm run dev --workspace=@trackmate/backend
+# Option 1: Start all services in parallel
+npm run dev
 
-# In Terminal 3: Start Frontend SPA
-npm run dev --workspace=@trackmate/frontend
+# Option 2: Or start individual services:
+npm run dev --workspace=@trackmate/mcp-server   # Port 3002
+npm run dev --workspace=@trackmate/backend      # Port 3001
+npm run dev --workspace=@trackmate/frontend     # Port 5173
+```
+
+#### 4. Run Test Suite
+```bash
+# Run Vitest across all monorepo packages
+npm test
+
+# Run standalone 37-point MCP protocol verification audit
+node mcp-audit.mjs
 ```
 
 ---
@@ -173,7 +213,7 @@ node mcp-audit.mjs
   ✅ PASS  ping returns {}
 
 [CHECK 3] tools/list — tool discovery
-  ✅ PASS  12 tools registered
+  ✅ PASS  15 tools registered
 
 [CHECK 4] tools/call get_tasks (plain JSON response)
   ✅ PASS  HTTP 200 plain JSON result
@@ -207,12 +247,14 @@ In the web interface, open **AI Agent** and try:
    → Invokes `get_daily_priorities` and computes urgency scores.
 2. **"Show my overdue tasks."**  
    → Invokes `get_overdue_tasks` and surfaces lapsed deadlines.
-3. **"What's blocking my TrackMate project?"**  
+3. **"What's blocking QLYQ?"**  
    → Invokes `get_project_status` and isolates blocker tasks.
 4. **"Create a high priority task called Finish authentication due tomorrow"**  
    → Invokes `create_task`, computes date, and adds task to database.
-5. **"Summarize TrackMate AI project."**  
+5. **"Summarize QLYQ project."**  
    → Invokes `summarize_project` and provides actionable recommendations.
+6. **"Summarize recent GitHub activity for the repository"**  
+   → Invokes `summarize_github_activity` and retrieves PRs, issues, and stale work.
 
 ---
 
@@ -223,17 +265,23 @@ trackmate-ai/
 │
 ├── packages/
 │   ├── shared/             # Shared TypeScript types & MCP interfaces
-│   ├── database/           # Drizzle schema, SQLite database & seeds
-│   ├── mcp-server/         # Streamable HTTP MCP server (Port 3002)
-│   │   └── src/tools/      # 12 executable MCP tools
+│   ├── database/           # Mongoose schemas, MongoDB models & seeds
+│   ├── mcp-server/         # Streamable HTTP MCP server (Port 3002, 15 tools)
+│   │   ├── Dockerfile      # Production multi-stage Docker build
+│   │   └── src/tools/      # 15 executable MCP tools (tasks, projects, github)
 │   └── backend/            # Express REST gateway & Bedrock agent (Port 3001)
+│       └── Dockerfile      # Production multi-stage Docker build
 │
 ├── frontend/               # React 18, Vite & CSS design system (Port 5173)
-│   ├── src/pages/          # Dashboard, Projects, Tasks, Team, AI Chat
+│   ├── Dockerfile          # Multi-stage build + Nginx static server & proxy
+│   ├── nginx.conf          # SPA fallback + /api/ reverse proxy configuration
+│   ├── src/pages/          # Dashboard, Projects, Tasks, Team, GitHub, AI Chat
 │   └── src/components/     # Sidebar, TaskCard, widgets
 │
 ├── docs/                   # Architecture, MCP reference, API docs, Demo script
-├── docker-compose.yml      # Multi-container orchestration
+├── docker-compose.yml      # Multi-container orchestration (mongo, mcp, backend, web)
+├── .dockerignore           # Build context exclusion for root
+├── .env.example            # Environment variables & secret documentation
 ├── mcp-audit.mjs           # Automated 37-check MCP protocol test suite
 ├── package.json            # Root monorepo workspace
 └── LICENSE                 # MIT License

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useChatStore } from '../store';
 import { aiApi, type ChatMessage, type ToolCallMetadata } from '../services/endpoints';
+import QlyqAIOrb, { type AIOrbState } from '../components/QlyqAIOrb';
 import {
   Bot,
   SendHorizontal,
@@ -20,7 +21,7 @@ import {
 const SUGGESTIONS = [
   { label: "Today's priorities", query: "What should I work on today?", icon: Clock },
   { label: "Overdue tasks", query: "Show my overdue tasks.", icon: AlertCircle },
-  { label: "Check blockers", query: "What is blocking TrackMate AI?", icon: AlertCircle },
+  { label: "Check blockers", query: "What is blocking QLYQ?", icon: AlertCircle },
   { label: "Create task", query: "Create a high-priority task called 'Implement Webhook listener' due tomorrow.", icon: PlusCircle },
   { label: "Summarize projects", query: "Summarize my active projects and their completion status.", icon: CheckCircle2 },
 ];
@@ -47,6 +48,14 @@ function getToolDisplayInfo(name: string, input?: Record<string, unknown>): { la
       return { label: "Fetching tasks...", action: 'Retrieved task database records' };
     case 'get_projects':
       return { label: "Fetching projects...", action: 'Retrieved active workspace projects' };
+    case 'get_github_issues':
+      return { label: "Fetching GitHub issues...", action: 'Retrieved repository issues' };
+    case 'get_github_pull_requests':
+      return { label: "Fetching pull requests...", action: 'Retrieved active pull requests' };
+    case 'get_stale_github_issues':
+      return { label: "Checking stale work...", action: 'Identified inactive GitHub issues' };
+    case 'summarize_github_activity':
+      return { label: "Summarizing GitHub pulse...", action: 'Synthesized repository activity pulse' };
     case 'summarize_project':
       return { label: "Updating project...", action: 'Generated project executive summary' };
     default:
@@ -56,6 +65,9 @@ function getToolDisplayInfo(name: string, input?: Record<string, unknown>): { la
 
 function getLoadingActionText(prompt: string): string {
   const p = prompt.toLowerCase();
+  if (p.includes('github') || p.includes('pr') || p.includes('pull request') || p.includes('repo')) {
+    return "Fetching GitHub intelligence...";
+  }
   if (p.includes('priorit') || p.includes('today') || p.includes('work on')) {
     return "Getting today's priorities...";
   }
@@ -152,6 +164,7 @@ export default function AIChatPage() {
   const { messages, isLoading, addMessage, setLoading, setError, clearMessages } = useChatStore();
   const [input, setInput] = useState('');
   const [lastUserPrompt, setLastUserPrompt] = useState<string>('');
+  const [orbState, setOrbState] = useState<AIOrbState>('idle');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -168,10 +181,26 @@ export default function AIChatPage() {
     addMessage(userMsg);
     setLoading(true);
     setError(null);
+    setOrbState('thinking');
 
     try {
+      // Simulate real dispatch event to executing state if prompt implies tools
+      const p = content.toLowerCase();
+      if (
+        p.includes('work') ||
+        p.includes('task') ||
+        p.includes('project') ||
+        p.includes('priority') ||
+        p.includes('github') ||
+        p.includes('deadline')
+      ) {
+        setTimeout(() => setOrbState('executing'), 400);
+      }
+
       // Send chat history to backend agent orchestration
       const response = await aiApi.chat([...messages, userMsg]);
+      setOrbState('receiving');
+
       addMessage({
         role: 'assistant',
         content: response.reply,
@@ -185,13 +214,18 @@ export default function AIChatPage() {
         queryClient.invalidateQueries({ queryKey: ['deadlines'] });
         queryClient.invalidateQueries({ queryKey: ['priorities'] });
       }
+
+      setTimeout(() => setOrbState('success'), 300);
+      setTimeout(() => setOrbState('idle'), 2200);
     } catch (e: any) {
       const msg = e?.response?.data?.error ?? e.message ?? 'Failed to communicate with AI Assistant.';
       setError(msg);
+      setOrbState('error');
       addMessage({
         role: 'assistant',
         content: `Sorry, an error occurred: ${msg}`,
       });
+      setTimeout(() => setOrbState('idle'), 3500);
     } finally {
       setLoading(false);
     }
@@ -209,14 +243,22 @@ export default function AIChatPage() {
       {/* Header */}
       <div className="flex items-center justify-between pb-3 mb-2 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-surface-elevated border border-border flex items-center justify-center text-indigo-400">
-            <Bot size={20} />
+          <div className="relative flex items-center justify-center">
+            <QlyqAIOrb state={orbState} size={46} interactive={true} />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-lg font-bold text-white tracking-tight">AI Assistant</h1>
-              <span className="badge badge-low text-[10px] font-mono tracking-wide py-0.5 px-2 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                MCP 2025-11-25
+              <span className={`badge text-[10px] font-mono tracking-wide py-0.5 px-2 transition-colors ${
+                orbState === 'executing'
+                  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/30'
+                  : orbState === 'thinking'
+                  ? 'bg-indigo-500/10 text-indigo-400 border border-indigo-500/30 animate-pulse'
+                  : orbState === 'error'
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30'
+                  : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+              }`}>
+                {orbState === 'executing' ? 'MCP EXECUTING' : orbState === 'thinking' ? 'THINKING' : 'MCP 2025-11-25'}
               </span>
             </div>
             <p className="text-xs text-text-muted">
@@ -265,13 +307,13 @@ export default function AIChatPage() {
       >
         {messages.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-surface-card border border-border flex items-center justify-center text-indigo-400 shadow-sm">
-              <Bot size={24} />
+            <div className="relative flex items-center justify-center">
+              <QlyqAIOrb state={orbState} size={80} interactive={true} />
             </div>
             <div className="max-w-md space-y-1">
-              <h2 className="text-base font-bold text-white">How can I assist your workflow today?</h2>
+              <h2 className="text-base font-bold text-white">How can QLYQ assist your workflow today?</h2>
               <p className="text-xs text-text-muted leading-relaxed">
-                I can review priorities, inspect project blockers, schedule tasks, and track deadlines using the self-hosted MCP tool server.
+                Think less. Ship more. I coordinate priorities, analyze blockers, schedule tasks, and track GitHub repository activity via the self-hosted MCP tool server.
               </p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-left w-full max-w-lg mt-2">

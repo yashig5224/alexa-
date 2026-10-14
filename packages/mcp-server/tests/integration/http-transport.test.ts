@@ -83,7 +83,7 @@ describe('MCP Streamable HTTP Transport (integration)', () => {
   });
 
   // ── tools/list ─────────────────────────────────────────────────────────────
-  it('POST /mcp tools/list returns 12 tools', async () => {
+  it('POST /mcp tools/list returns 15 tools', async () => {
     const { res, data } = await mcpPost({
       jsonrpc: '2.0',
       id: 3,
@@ -93,7 +93,7 @@ describe('MCP Streamable HTTP Transport (integration)', () => {
     expect(res.status).toBe(200);
     const tools = (data['result'] as Record<string, unknown>)['tools'] as unknown[];
     expect(Array.isArray(tools)).toBe(true);
-    expect(tools.length).toBe(12);
+    expect(tools.length).toBe(15);
   });
 
   // ── tools/call — invalid tool ───────────────────────────────────────────────

@@ -1,15 +1,18 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
-import DashboardPage from './pages/DashboardPage';
-import TasksPage from './pages/TasksPage';
-import ProjectsPage from './pages/ProjectsPage';
-import ProjectDetailPage from './pages/ProjectDetailPage';
-import DeadlinesPage from './pages/DeadlinesPage';
-import AIChatPage from './pages/AIChatPage';
-import GitHubPage from './pages/GitHubPage';
-import SettingsPage from './pages/SettingsPage';
-import TeamPage from './pages/TeamPage';
+
+// Route-level code-splitting
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const TasksPage = lazy(() => import('./pages/TasksPage'));
+const ProjectsPage = lazy(() => import('./pages/ProjectsPage'));
+const ProjectDetailPage = lazy(() => import('./pages/ProjectDetailPage'));
+const DeadlinesPage = lazy(() => import('./pages/DeadlinesPage'));
+const AIChatPage = lazy(() => import('./pages/AIChatPage'));
+const GitHubPage = lazy(() => import('./pages/GitHubPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const TeamPage = lazy(() => import('./pages/TeamPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: {

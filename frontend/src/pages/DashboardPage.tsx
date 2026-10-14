@@ -21,6 +21,7 @@ import {
   Check,
   Plus,
 } from 'lucide-react';
+import QlyqAIOrb from '../components/QlyqAIOrb';
 
 export default function DashboardPage() {
   const queryClient = useQueryClient();
@@ -112,18 +113,22 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 max-w-7xl mx-auto pb-12">
       {/* ── Top Header & Greeting ───────────────────────────────────────── */}
+      {/* Header with QLYQ AI Orb */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-white/5 pb-6">
-        <div>
-          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-1">
-            <Calendar size={14} />
-            <span>{todayDateStr}</span>
+        <div className="flex items-center gap-4">
+          <QlyqAIOrb state="idle" size={54} interactive={true} className="shrink-0" />
+          <div>
+            <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-indigo-400 mb-0.5">
+              <Calendar size={14} />
+              <span>{todayDateStr}</span>
+            </div>
+            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
+              Welcome back, Alex
+            </h1>
+            <p className="text-sm text-slate-400 mt-0.5">
+              QLYQ has analyzed your projects and prioritized today's action items. Think less. Ship more.
+            </p>
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
-            Welcome back, Alex
-          </h1>
-          <p className="text-sm text-slate-400 mt-1">
-            TrackMate AI has analyzed your projects and prioritized today's action items.
-          </p>
         </div>
 
         {/* AI Action CTA */}
@@ -494,7 +499,7 @@ export default function DashboardPage() {
               {[
                 'What should I work on today?',
                 'Show my overdue tasks.',
-                'What is blocking TrackMate AI?',
+                'What is blocking QLYQ?',
                 'Summarize my project.',
               ].map((prompt, pi) => (
                 <Link

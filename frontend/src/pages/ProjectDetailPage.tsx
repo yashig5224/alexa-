@@ -131,7 +131,7 @@ export default function ProjectDetailPage() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['project', id, 'tasks'] });
-      alert('Issue converted to TrackMate task!');
+      alert('Issue converted to QLYQ task!');
     },
   });
 
