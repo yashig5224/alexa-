@@ -6,7 +6,7 @@ export const aiRouter = Router();
 /**
  * POST /api/ai/chat
  * Body: { messages: [{ role: 'user' | 'assistant'; content: string }] }
- * Returns: { reply: string, toolCalls: [...] }
+ * Returns: { reply, toolCalls, providerMode, contextInjected }
  */
 aiRouter.post('/chat', async (req, res) => {
   try {
@@ -19,9 +19,15 @@ aiRouter.post('/chat', async (req, res) => {
       .map(m => ({ role: m.role, content: String(m.content ?? '') }));
 
     const result = await processChat(messages);
-    res.json({ reply: result.reply, toolCalls: result.toolCalls });
+    res.json({
+      reply: result.reply,
+      toolCalls: result.toolCalls,
+      providerMode: result.providerMode,
+      contextInjected: result.contextInjected,
+    });
   } catch (err: any) {
     console.error('[AI] error processing chat:', err);
     res.status(500).json({ error: err?.message ?? 'Internal server error' });
   }
 });
+

@@ -4,6 +4,8 @@ import type { McpToolDefinition } from '@trackmate/shared';
 // AIProvider Interface — Modular AI Layer (Amazon Bedrock & Mock)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export type ConversationTurn = { role: 'user' | 'assistant'; content: string };
+
 export interface ToolUseRequest {
   id: string;
   name: string;
@@ -31,16 +33,22 @@ export interface AgentChatResult {
     input: Record<string, unknown>;
     output: unknown;
   }>;
+  /** Which provider produced this response */
+  providerMode: 'mock' | 'bedrock' | string;
+  /** Whether workspace context was injected */
+  contextInjected: boolean;
 }
 
 export interface AIProvider {
   readonly name: string;
+  /** Identifies this provider as mock (offline/deterministic) */
+  readonly isMock: boolean;
 
   /**
    * Send a conversation to the AI provider to determine text response or tool calls.
    */
   chat(params: {
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    messages: ConversationTurn[];
     tools: McpToolDefinition[];
     systemPrompt: string;
   }): Promise<AIResponse>;
@@ -49,10 +57,11 @@ export interface AIProvider {
    * Return tool execution results to the AI provider to produce a natural-language answer.
    */
   chatWithToolResult(params: {
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    messages: ConversationTurn[];
     tools: McpToolDefinition[];
     systemPrompt: string;
     toolUseRequests: ToolUseRequest[];
     toolResults: ToolExecutionResult[];
   }): Promise<AIResponse>;
 }
+

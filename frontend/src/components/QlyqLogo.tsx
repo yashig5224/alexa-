@@ -1,227 +1,216 @@
 import React from 'react';
 
 export interface QlyqLogoProps {
-  /** Variant of the logo: symbol-only, horizontal lockup, or symbol with tagline */
   variant?: 'symbol' | 'horizontal' | 'vertical';
-  /** Color theme */
-  theme?: 'dark' | 'light' | 'monochrome' | 'monochrome-dark';
-  /** Size in pixels (applies to symbol width/height) */
+  theme?: 'dark' | 'light' | 'monochrome';
   size?: number;
-  /** Custom CSS classes */
   className?: string;
-  /** Show tagline below wordmark in lockup */
   showTagline?: boolean;
+  animate?: boolean;
 }
 
 /**
- * Signature QLYQ Interwoven Ribbon Vector Symbol
- * Inspired by the official QLYQ brand identity — representing intelligence, connection, and momentum.
+ * QLYQ Brand Symbol — Geometric Q-ring with inner spark
+ *
+ * Design rationale:
+ * - Bold outer ring with a sharp diagonal tail → letter Q
+ * - Inner 4-pointed diamond spark → intelligence / AI core
+ * - Violet → blue gradient ties to the QLYQ design system
+ * - Readable at 16 px and crisp at 256 px
  */
 export const QlyqSymbol: React.FC<{
   size?: number;
-  theme?: 'dark' | 'light' | 'monochrome' | 'monochrome-dark';
+  theme?: 'dark' | 'light' | 'monochrome';
   className?: string;
-}> = ({ size = 32, theme = 'dark', className = '' }) => {
-  const gradientId = React.useId();
-  const glowId = React.useId();
+  animate?: boolean;
+}> = ({ size = 32, theme = 'dark', className = '', animate = false }) => {
+  const uid = React.useId().replace(/:/g, '');
+  const isDark  = theme === 'dark';
+  const isLight = theme === 'light';
+  const isMono  = theme === 'monochrome';
 
-  // Color mapping based on theme
-  const isMono = theme === 'monochrome';
-  const isMonoDark = theme === 'monochrome-dark';
+  const ringStroke  = isMono ? (isLight ? '#312E81' : '#94A3B8') : `url(#${uid}-ring)`;
+  const tailStroke  = isMono ? (isLight ? '#4338CA' : '#64748B') : `url(#${uid}-ring)`;
+  const sparkFill   = isMono ? (isLight ? '#4338CA' : '#CBD5E1') : `url(#${uid}-spark)`;
+  const bgOpacity   = isDark ? '0.07' : '0';
 
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 120 120"
+      viewBox="0 0 48 48"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={`shrink-0 transition-transform duration-300 ${className}`}
-      aria-label="QLYQ Ribbon Symbol"
+      className={`shrink-0 ${animate ? 'animate-pulse' : ''} ${className}`}
+      aria-label="QLYQ"
+      role="img"
     >
       <defs>
-        {/* Primary Ribbon Gradient 1: Violet to Lavender */}
-        <linearGradient id={`${gradientId}-ribbon-1`} x1="20" y1="20" x2="100" y2="100" gradientUnits="userSpaceOnUse">
-          {isMono ? (
-            <>
-              <stop offset="0%" stopColor="#FFFFFF" />
-              <stop offset="100%" stopColor="#94A3B8" />
-            </>
-          ) : isMonoDark ? (
-            <>
-              <stop offset="0%" stopColor="#475569" />
-              <stop offset="100%" stopColor="#0F172A" />
-            </>
-          ) : (
-            <>
-              <stop offset="0%" stopColor="#7C3AED" />
-              <stop offset="45%" stopColor="#A78BFA" />
-              <stop offset="100%" stopColor="#60A5FA" />
-            </>
-          )}
+        {/* Ring: violet → lavender → sky */}
+        <linearGradient id={`${uid}-ring`} x1="6" y1="6" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#7C3AED" />
+          <stop offset="55%"  stopColor="#A78BFA" />
+          <stop offset="100%" stopColor="#60A5FA" />
         </linearGradient>
 
-        {/* Ribbon Gradient 2: Blue Glow to Lavender */}
-        <linearGradient id={`${gradientId}-ribbon-2`} x1="100" y1="30" x2="30" y2="110" gradientUnits="userSpaceOnUse">
-          {isMono ? (
-            <>
-              <stop offset="0%" stopColor="#E2E8F0" />
-              <stop offset="100%" stopColor="#64748B" />
-            </>
-          ) : isMonoDark ? (
-            <>
-              <stop offset="0%" stopColor="#334155" />
-              <stop offset="100%" stopColor="#0B0B14" />
-            </>
-          ) : (
-            <>
-              <stop offset="0%" stopColor="#60A5FA" />
-              <stop offset="55%" stopColor="#A78BFA" />
-              <stop offset="100%" stopColor="#5B21B6" />
-            </>
-          )}
+        {/* Spark: soft lavender → cyan */}
+        <linearGradient id={`${uid}-spark`} x1="17" y1="17" x2="31" y2="31" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stopColor="#C4B5FD" />
+          <stop offset="100%" stopColor="#67E8F9" />
         </linearGradient>
 
-        {/* Ribbon Gradient 3: Underflow fold */}
-        <linearGradient id={`${gradientId}-ribbon-3`} x1="40" y1="100" x2="90" y2="20" gradientUnits="userSpaceOnUse">
-          {isMono ? (
-            <>
-              <stop offset="0%" stopColor="#CBD5E1" />
-              <stop offset="100%" stopColor="#475569" />
-            </>
-          ) : isMonoDark ? (
-            <>
-              <stop offset="0%" stopColor="#1E293B" />
-              <stop offset="100%" stopColor="#020617" />
-            </>
-          ) : (
-            <>
-              <stop offset="0%" stopColor="#C4B5FD" />
-              <stop offset="50%" stopColor="#7C3AED" />
-              <stop offset="100%" stopColor="#4C1D95" />
-            </>
-          )}
-        </linearGradient>
-
-        {/* Specular Highlight Gradient */}
-        <linearGradient id={`${gradientId}-specular`} x1="30" y1="25" x2="60" y2="60" gradientUnits="userSpaceOnUse">
-          <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.8" />
-          <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
-        </linearGradient>
-
-        {/* Ambient Soft Glow Filter */}
-        <filter id={glowId} x="-20%" y="-20%" width="140%" height="140%">
-          <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#7C3AED" floodOpacity="0.3" />
+        {/* Ambient glow */}
+        <filter id={`${uid}-glow`} x="-40%" y="-40%" width="180%" height="180%">
+          <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="b" />
+          <feColorMatrix in="b" type="matrix"
+            values="0 0 0 0 0.49  0 0 0 0 0.35  0 0 0 0 0.98  0 0 0 0.65 0"
+            result="glow" />
+          <feMerge>
+            <feMergeNode in="glow" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
         </filter>
       </defs>
 
-      {/* Outer Glow Halo */}
-      <circle cx="60" cy="60" r="46" fill="#A78BFA" fillOpacity={isMono || isMonoDark ? '0' : '0.04'} />
+      {/* Tinted backdrop disc */}
+      <circle cx="24" cy="24" r="22" fill="#7C3AED" fillOpacity={bgOpacity} />
 
-      {/* Abstract Interwoven Ribbon Loops (Trefoil Mobius Topology) */}
-      <g filter={`url(#${glowId})`}>
-        {/* Loop Segment A: Top-Right loop flowing under */}
-        <path
-          d="M 60 22 C 78 22 96 35 96 56 C 96 74 82 86 64 92 C 50 96 36 90 28 80 C 20 70 20 54 30 42 C 40 30 52 28 60 22 Z"
-          fill={`url(#${gradientId}-ribbon-1)`}
-          fillOpacity="0.95"
-        />
+      {/* ── Q ring ── */}
+      <circle
+        cx="22" cy="20"
+        r="10"
+        stroke={ringStroke}
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        fill="none"
+        filter={isDark ? `url(#${uid}-glow)` : undefined}
+      />
 
-        {/* Loop Segment B: Interwoven Bottom fold crossing across */}
-        <path
-          d="M 32 46 C 44 32 66 30 82 42 C 94 52 98 68 90 82 C 82 94 66 98 52 94 C 36 88 26 72 28 56 C 29 52 30 49 32 46 Z"
-          fill={`url(#${gradientId}-ribbon-2)`}
-          fillOpacity="0.85"
-        />
+      {/* ── Q tail (diagonal, bottom-right) ── */}
+      <line
+        x1="29" y1="27"
+        x2="37" y2="37"
+        stroke={tailStroke}
+        strokeWidth="3.4"
+        strokeLinecap="round"
+        filter={isDark ? `url(#${uid}-glow)` : undefined}
+      />
 
-        {/* Loop Segment C: Inner crest with core shadow to produce volumetric ribbon depth */}
-        <path
-          d="M 48 38 C 58 32 74 36 82 46 C 88 54 88 66 80 74 C 72 82 58 84 48 78 C 38 72 36 60 42 50 C 44 45 46 41 48 38 Z"
-          fill={`url(#${gradientId}-ribbon-3)`}
-          fillOpacity="0.9"
-        />
-
-        {/* Specular Ridge / Light Edge */}
-        <path
-          d="M 52 24 C 68 24 88 36 92 52 C 94 60 90 70 82 78"
-          stroke={`url(#${gradientId}-specular)`}
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        />
-        <path
-          d="M 32 50 C 38 40 50 34 64 34"
-          stroke={`url(#${gradientId}-specular)`}
-          strokeWidth="1.75"
-          strokeLinecap="round"
-        />
-      </g>
+      {/* ── Inner spark / 4-pointed diamond ── */}
+      <path
+        d="M22 13.5 L23.2 18.8 L28.5 20 L23.2 21.2 L22 26.5 L20.8 21.2 L15.5 20 L20.8 18.8 Z"
+        fill={sparkFill}
+        opacity="0.92"
+      />
     </svg>
   );
 };
 
 /**
- * Reusable QLYQ Logo Component
- * Supports standalone symbol, horizontal lockup, vertical lockup, and dark/light/monochrome themes.
+ * QLYQ Wordmark text block
+ */
+const QlyqWordmark: React.FC<{
+  theme?: 'dark' | 'light' | 'monochrome';
+  size?: number;
+  showTagline?: boolean;
+}> = ({ theme = 'dark', size = 20, showTagline = false }) => {
+  const isLight = theme === 'light';
+  const isMono  = theme === 'monochrome';
+  const nameColor    = isMono ? (isLight ? '#0F172A' : '#F1F5F9') : '#FFFFFF';
+  const taglineColor = isMono ? (isLight ? '#475569' : '#64748B') : '#6D7DA8';
+
+  return (
+    <div className="flex flex-col items-start select-none">
+      <div className="flex items-end gap-1" style={{ lineHeight: 1 }}>
+        <span
+          style={{
+            fontSize: `${size}px`,
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontWeight: 800,
+            letterSpacing: '-0.04em',
+            color: nameColor,
+          }}
+        >
+          QLYQ
+        </span>
+        {/* Accent dot */}
+        <span
+          style={{
+            width: '5px',
+            height: '5px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg,#A78BFA,#60A5FA)',
+            display: 'inline-block',
+            marginBottom: '3px',
+            flexShrink: 0,
+          }}
+        />
+      </div>
+      {showTagline && (
+        <span
+          style={{
+            fontSize: `${Math.max(8, Math.round(size * 0.42))}px`,
+            fontFamily: "'Inter', system-ui, sans-serif",
+            fontWeight: 500,
+            letterSpacing: '0.12em',
+            textTransform: 'uppercase',
+            color: taglineColor,
+            marginTop: '4px',
+          }}
+        >
+          Think less. Ship more.
+        </span>
+      )}
+    </div>
+  );
+};
+
+/**
+ * Full QLYQ Logo lockup — symbol + wordmark
  */
 export const QlyqLogo: React.FC<QlyqLogoProps> = ({
   variant = 'horizontal',
   theme = 'dark',
   size = 32,
   className = '',
-  showTagline = true,
+  showTagline = false,
+  animate = false,
 }) => {
-  const isLight = theme === 'light';
-  const isMono = theme === 'monochrome';
-  const isMonoDark = theme === 'monochrome-dark';
-
-  const textColor = isLight
-    ? 'text-slate-900'
-    : isMono
-    ? 'text-white'
-    : isMonoDark
-    ? 'text-slate-900'
-    : 'text-white';
-
-  const taglineColor = isLight
-    ? 'text-slate-500'
-    : isMono
-    ? 'text-slate-400'
-    : isMonoDark
-    ? 'text-slate-600'
-    : 'text-slate-400';
-
   if (variant === 'symbol') {
-    return <QlyqSymbol size={size} theme={theme} className={className} />;
+    return <QlyqSymbol size={size} theme={theme} className={className} animate={animate} />;
   }
+
+  const tileSize  = size + 12;
+  const tileRadius = Math.round(tileSize * 0.27);
 
   return (
     <div
-      className={`inline-flex items-center gap-3 select-none ${
-        variant === 'vertical' ? 'flex-col text-center' : 'flex-row'
+      className={`inline-flex select-none ${
+        variant === 'vertical' ? 'flex-col items-center gap-2' : 'flex-row items-center gap-2.5'
       } ${className}`}
     >
-      <QlyqSymbol size={size} theme={theme} />
-
-      <div className={`flex flex-col ${variant === 'vertical' ? 'items-center' : 'items-start'}`}>
-        <div className="flex items-center gap-1.5">
-          <span
-            className={`font-sans font-extrabold tracking-tight ${textColor}`}
-            style={{ fontSize: `${Math.max(16, size * 0.65)}px`, lineHeight: 1 }}
-          >
-            QLYQ
-          </span>
-          <span className="w-1.5 h-1.5 rounded-full bg-violet-400 mb-2 animate-pulse" />
-        </div>
-
-        {showTagline && (
-          <span
-            className={`font-sans uppercase font-semibold tracking-wider mt-1 ${taglineColor}`}
-            style={{ fontSize: `${Math.max(9, size * 0.28)}px`, letterSpacing: '0.08em' }}
-          >
-            Think less. Ship more.
-          </span>
-        )}
+      {/* Symbol tile with gradient border */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: `${tileSize}px`,
+          height: `${tileSize}px`,
+          borderRadius: `${tileRadius}px`,
+          background: 'linear-gradient(135deg, rgba(124,58,237,0.16) 0%, rgba(96,165,250,0.09) 100%)',
+          border: '1px solid rgba(167,139,250,0.2)',
+          flexShrink: 0,
+        }}
+      >
+        <QlyqSymbol size={size} theme={theme} animate={animate} />
       </div>
+
+      <QlyqWordmark
+        theme={theme}
+        size={Math.max(14, Math.round(size * 0.65))}
+        showTagline={showTagline}
+      />
     </div>
   );
 };

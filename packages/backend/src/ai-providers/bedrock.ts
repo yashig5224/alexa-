@@ -10,6 +10,7 @@ import type {
   AIResponse,
   ToolUseRequest,
   ToolExecutionResult,
+  ConversationTurn,
 } from './interface.js';
 import type { McpToolDefinition } from '@trackmate/shared';
 
@@ -20,6 +21,7 @@ import type { McpToolDefinition } from '@trackmate/shared';
 
 export class BedrockProvider implements AIProvider {
   readonly name = 'Amazon Bedrock';
+  readonly isMock = false;
   private readonly client: BedrockRuntimeClient;
   private readonly modelId: string;
 
@@ -41,7 +43,7 @@ export class BedrockProvider implements AIProvider {
    * Initial chat turn: Ask Bedrock whether a tool call is required or if it can answer directly.
    */
   async chat(params: {
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    messages: ConversationTurn[];
     tools: McpToolDefinition[];
     systemPrompt: string;
   }): Promise<AIResponse> {
@@ -105,7 +107,7 @@ export class BedrockProvider implements AIProvider {
    * Follow-up turn: Return MCP tool results back to Bedrock to synthesize the final natural-language response.
    */
   async chatWithToolResult(params: {
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    messages: ConversationTurn[];
     tools: McpToolDefinition[];
     systemPrompt: string;
     toolUseRequests: ToolUseRequest[];

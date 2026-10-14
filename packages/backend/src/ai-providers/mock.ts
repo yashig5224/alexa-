@@ -3,26 +3,55 @@ import type {
   AIResponse,
   ToolUseRequest,
   ToolExecutionResult,
+  ConversationTurn,
 } from './interface.js';
 import type { McpToolDefinition } from '@trackmate/shared';
 import { ProjectService, TaskService } from '@trackmate/database';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Mock AI Provider — for local development and offline hackathon evaluation
-// Deterministically handles natural-language intent detection and synthesizes
-// conversational responses from real MCP tool outputs without making paid AWS calls.
+// Mock AI Provider — deterministic, offline, safe for CI and development
+//
+// IMPORTANT: This provider does NOT perform LLM reasoning. It uses rule-based
+// intent detection to select tools and template-based response synthesis.
+// Responses are clearly labeled [MOCK MODE] and must never be mistaken for
+// live AI output.
+//
+// Improvements over v1:
+// - isMock flag for provider identification in API responses
+// - Conversation history awareness for simple follow-up questions
+// - Broader synonym sets for intent matching
+// - Silent wrong-task mutation bug FIXED (requires confirmed title match)
+// - Honest fallback when intent is unrecognized
 // ─────────────────────────────────────────────────────────────────────────────
+
 
 export class MockProvider implements AIProvider {
   readonly name = 'Mock AI Provider (Local)';
+  readonly isMock = true;
 
   async chat(params: {
-    messages: Array<{ role: 'user' | 'assistant'; content: string }>;
+    messages: ConversationTurn[];
     tools: McpToolDefinition[];
     systemPrompt: string;
   }): Promise<AIResponse> {
     const lastMessage = params.messages[params.messages.length - 1]?.content ?? '';
     const lower = lastMessage.toLowerCase();
+
+    // Check if this is a short follow-up to a previous assistant message
+    const prevAssistant = [...params.messages].reverse().find((m) => m.role === 'assistant');
+    const isShortFollowUp = prevAssistant != null &&
+      lower.length < 100 &&
+      (lower.startsWith('why') || lower.startsWith('what about') ||
+       lower.startsWith('which') || lower.startsWith('tell me more') ||
+       lower.startsWith('explain') || lower === 'ok' || lower === 'yes' || lower === 'sure');
+
+    if (isShortFollowUp) {
+      return {
+        text: this.synthesizeFollowUp(lower, prevAssistant.content),
+        toolUseRequests: [],
+        stopReason: 'end_turn',
+      };
+    }
 
     // 1. Detect if a tool call is required based on user intent
     const toolIntent = await this.detectIntent(lower, lastMessage);
@@ -30,30 +59,19 @@ export class MockProvider implements AIProvider {
     if (toolIntent) {
       return {
         text: null,
-        toolUseRequests: [
-          {
-            id: `mock-tool-${Date.now()}`,
-            name: toolIntent.tool,
-            input: toolIntent.args,
-          },
-        ],
+        toolUseRequests: [{ id: `mock-tool-${Date.now()}`, name: toolIntent.tool, input: toolIntent.args }],
         stopReason: 'tool_use',
       };
     }
 
-    // 2. Direct conversational answer when no tool is needed
+    // 2. Direct conversational answer
     return {
-      text: `Hello! I'm QLYQ (formerly TrackMate AI), your MCP-powered AI project and developer assistant. Think less. Ship more. You can ask me questions or command actions such as:\n` +
-        `• "What should I work on today?"\n` +
-        `• "Show my overdue tasks."\n` +
-        `• "What is blocking QLYQ?"\n` +
-        `• "Create a task to finish the API tomorrow."\n` +
-        `• "Move the authentication task to in progress."\n` +
-        `• "Summarize my project."`,
+      text: this.synthesizeDirectAnswer(lastMessage),
       toolUseRequests: [],
       stopReason: 'end_turn',
     };
   }
+
 
   /**
    * Follow-up turn: Synthesizes a natural-language response from the MCP tool output.
