@@ -26,9 +26,12 @@ import {
   get_daily_priorities, get_daily_priorities_definition,
 } from './priorities.js';
 
-// GitHub tool
+// GitHub tools (Phase 5A)
 import {
-  get_github_issues, get_github_issues_definition,
+  get_github_issues,          get_github_issues_definition,
+  get_github_pull_requests,   get_github_pull_requests_definition,
+  get_stale_github_issues,    get_stale_github_issues_definition,
+  summarize_github_activity,  summarize_github_activity_definition,
 } from './github.js';
 
 // Summarize tool
@@ -54,6 +57,9 @@ export const ALL_TOOLS: Record<string, ToolHandler> = {
   get_overdue_tasks,
   get_daily_priorities,
   get_github_issues,
+  get_github_pull_requests,
+  get_stale_github_issues,
+  summarize_github_activity,
   summarize_project,
 };
 
@@ -69,5 +75,8 @@ export const TOOL_DEFINITIONS: McpToolDefinition[] = [
   get_overdue_tasks_definition,
   get_daily_priorities_definition,
   get_github_issues_definition,
+  get_github_pull_requests_definition,
+  get_stale_github_issues_definition,
+  summarize_github_activity_definition,
   summarize_project_definition,
 ];

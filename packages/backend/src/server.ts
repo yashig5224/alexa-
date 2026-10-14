@@ -10,6 +10,7 @@ import { usersRouter }      from './routes/users.js';
 import { deadlinesRouter }  from './routes/deadlines.js';
 import { prioritiesRouter } from './routes/priorities.js';
 import { aiRouter }         from './routes/ai.js';
+import { githubRouter }     from './routes/github.js';
 
 const PORT        = parseInt(process.env['PORT'] ?? '3001', 10);
 const CORS_ORIGIN = process.env['CORS_ORIGIN'] ?? 'http://localhost:5173';
@@ -65,6 +66,7 @@ app.use('/api/users',      usersRouter);
 app.use('/api/deadlines',  deadlinesRouter);
 app.use('/api/priorities', prioritiesRouter);
 app.use('/api/ai',         aiLimiter, aiRouter);
+app.use('/api/github',     githubRouter);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {

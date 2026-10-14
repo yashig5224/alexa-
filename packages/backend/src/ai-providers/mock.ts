@@ -235,6 +235,58 @@ export class MockProvider implements AIProvider {
       };
     }
 
+    // H. GitHub issues — "show github issues", "open issues", "list issues on repo"
+    if (
+      (msgLower.includes('github') && msgLower.includes('issue')) ||
+      (msgLower.includes('open issues') && !msgLower.includes('overdue')) ||
+      msgLower.includes('repo issues') ||
+      msgLower.includes('repository issues')
+    ) {
+      return {
+        tool: 'get_github_issues',
+        args: targetProject ? { projectId: targetProject.id, state: 'open' } : { state: 'open' },
+      };
+    }
+
+    // I. GitHub pull requests — "show PRs", "pull requests", "open PRs"
+    if (
+      msgLower.includes('pull request') ||
+      msgLower.includes('pr') ||
+      (msgLower.includes('github') && msgLower.includes('pr'))
+    ) {
+      return {
+        tool: 'get_github_pull_requests',
+        args: targetProject ? { projectId: targetProject.id, state: 'open' } : { state: 'open' },
+      };
+    }
+
+    // J. Stale GitHub issues — "stale issues", "inactive issues", "what's stale"
+    if (
+      msgLower.includes('stale') ||
+      msgLower.includes('inactive issue') ||
+      msgLower.includes('neglected issue') ||
+      (msgLower.includes('old') && msgLower.includes('issue'))
+    ) {
+      return {
+        tool: 'get_stale_github_issues',
+        args: targetProject
+          ? { projectId: targetProject.id, daysInactive: 14 }
+          : { daysInactive: 14 },
+      };
+    }
+
+    // K. GitHub activity summary — "github summary", "repo activity", "github overview"
+    if (
+      (msgLower.includes('github') && (msgLower.includes('summary') || msgLower.includes('activity') || msgLower.includes('overview'))) ||
+      msgLower.includes('repo activity') ||
+      msgLower.includes('repository summary')
+    ) {
+      return {
+        tool: 'summarize_github_activity',
+        args: targetProject ? { projectId: targetProject.id } : {},
+      };
+    }
+
     return null;
   }
 
@@ -323,6 +375,82 @@ export class MockProvider implements AIProvider {
         deadlines.forEach((t: any, i: number) => {
           lines.push(`${i + 1}. **${t.title}** — Due: **${t.dueDate}** (${t.priority.toUpperCase()})`);
         });
+        return lines.join('\n');
+      }
+
+      case 'get_github_issues': {
+        const issues = parsed.issues ?? [];
+        const repo = parsed.repository ?? 'unknown';
+        if (issues.length === 0) {
+          return `No ${parsed.state ?? 'open'} issues found in **${repo}**.`;
+        }
+        const lines = [
+          `📋 **${issues.length} ${parsed.state ?? 'open'} issue(s)** in **${repo}**${parsed.source === 'mock_data' ? ' (mock data)' : ''}:`,
+          '',
+        ];
+        issues.forEach((issue: any, i: number) => {
+          const labels = issue.labels?.length ? ` [${issue.labels.join(', ')}]` : '';
+          const assignees = issue.assignees?.length ? ` → ${issue.assignees.join(', ')}` : '';
+          lines.push(`${i + 1}. **#${issue.number}** ${issue.title}${labels}${assignees}`);
+        });
+        return lines.join('\n');
+      }
+
+      case 'get_github_pull_requests': {
+        const prs = parsed.pullRequests ?? [];
+        const repo = parsed.repository ?? 'unknown';
+        if (prs.length === 0) {
+          return `No ${parsed.state ?? 'open'} pull requests found in **${repo}**.`;
+        }
+        const lines = [
+          `🔀 **${prs.length} ${parsed.state ?? 'open'} pull request(s)** in **${repo}**${parsed.source === 'mock_data' ? ' (mock data)' : ''}:`,
+          '',
+        ];
+        prs.forEach((pr: any, i: number) => {
+          const draft = pr.draft ? ' 📝 Draft' : '';
+          const branch = pr.headBranch ? ` (${pr.headBranch} → ${pr.baseBranch})` : '';
+          lines.push(`${i + 1}. **#${pr.number}** ${pr.title}${draft}${branch} — by ${pr.user}`);
+        });
+        return lines.join('\n');
+      }
+
+      case 'get_stale_github_issues': {
+        const stale = parsed.staleIssues ?? [];
+        const repo = parsed.repository ?? 'unknown';
+        if (stale.length === 0) {
+          return `✅ No stale issues found in **${repo}** (threshold: ${parsed.thresholdDays ?? 14} days).`;
+        }
+        const lines = [
+          `⏰ **${stale.length} stale issue(s)** in **${repo}** (inactive ≥ ${parsed.thresholdDays ?? 14} days)${parsed.source === 'mock_data' ? ' (mock data)' : ''}:`,
+          '',
+        ];
+        stale.forEach((s: any, i: number) => {
+          const blocker = s.isPotentialBlocker ? ' 🚨 **Potential Blocker**' : '';
+          lines.push(`${i + 1}. **#${s.issue?.number}** ${s.issue?.title} — ${s.daysInactive} days inactive${blocker}`);
+          if (s.blockerReason) {
+            lines.push(`   *Reason:* ${s.blockerReason}`);
+          }
+        });
+        return lines.join('\n');
+      }
+
+      case 'summarize_github_activity': {
+        const repo = parsed.repository ?? 'unknown';
+        const lines = [
+          `📊 **GitHub Activity Summary for ${repo}**${parsed.source === 'mock_data' ? ' (mock data)' : ''}:`,
+          '',
+          `• Open Issues: **${parsed.openIssuesCount ?? 0}**`,
+          `• Open Pull Requests: **${parsed.openPullRequestsCount ?? 0}**`,
+          `• Stale Issues (≥14 days): **${parsed.staleIssuesCount ?? 0}**`,
+          `• Potential Blockers: **${parsed.potentialBlockersCount ?? 0}**`,
+        ];
+        const blockers = parsed.potentialBlockers ?? [];
+        if (blockers.length > 0) {
+          lines.push('', '🚨 **Potential Blockers:**');
+          blockers.forEach((b: any) => {
+            lines.push(`  - **#${b.issueNumber}** ${b.title} — ${b.reason}`);
+          });
+        }
         return lines.join('\n');
       }
 

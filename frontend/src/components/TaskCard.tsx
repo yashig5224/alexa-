@@ -12,6 +12,7 @@ interface Props {
 const STATUS_ICONS: Record<Task['status'], JSX.Element> = {
   todo:        <Circle size={14} />,
   in_progress: <Clock  size={14} style={{ color: 'var(--info)' }} />,
+  in_review:   <Clock  size={14} style={{ color: 'var(--warning)' }} />,
   done:        <Circle size={14} style={{ color: 'var(--success)' }} />,
   blocked:     <AlertTriangle size={14} style={{ color: 'var(--danger)' }} />,
 };
@@ -96,9 +97,9 @@ export default function TaskCard({ task, onClick, onStatusChange, onDelete }: Pr
               </span>
             )}
 
-            {task.githubIssueNumber && (
+            {task.githubIssueUrl && (
               <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                #{task.githubIssueNumber}
+                #{task.githubIssueUrl.split('/').pop()}
               </span>
             )}
           </div>

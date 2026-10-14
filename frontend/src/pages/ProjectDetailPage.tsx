@@ -4,487 +4,617 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   projectsApi,
   tasksApi,
+  usersApi,
   type Task,
   type GitHubIssue,
   type Priority,
-  type TaskStatus,
 } from '../services/endpoints';
-import TaskCard from '../components/TaskCard';
 import {
   ArrowLeft,
   Sparkles,
   Github,
-  CheckSquare,
-  AlertCircle,
+  AlertTriangle,
   Plus,
+  Users,
+  Check,
+  Trash2,
   ExternalLink,
-  Bot,
-  Filter,
+  Layers,
 } from 'lucide-react';
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
 
-  const [activeTab, setActiveTab] = useState<'tasks' | 'github'>('tasks');
-  const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm] = useState({
-    title: '',
-    description: '',
-    priority: 'medium' as Priority,
-    dueDate: '',
-  });
+  const [activeTab, setActiveTab] = useState<'tasks' | 'members' | 'github'>('tasks');
+  const [taskStatusFilter, setTaskStatusFilter] = useState<string>('all');
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskPriority, setTaskPriority] = useState<Priority>('medium');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [summary, setSummary] = useState<string | null>(null);
 
-  // Project details
-  const { data: project, isLoading: pLoading, error: pError } = useQuery({
+  // New member form
+  const [newMemberUserId, setNewMemberUserId] = useState('');
+  const [newMemberRole, setNewMemberRole] = useState('member');
+
+  // 1. Project details
+  const { data: project, isLoading: loadingProject } = useQuery({
     queryKey: ['project', id],
     queryFn: () => projectsApi.get(id!),
     enabled: !!id,
   });
 
-  // Project tasks
-  const { data: tasks = [], isLoading: tLoading } = useQuery({
-    queryKey: ['project-tasks', id],
+  // 2. Project status / progress metrics
+  const { data: progress } = useQuery({
+    queryKey: ['project', id, 'status'],
+    queryFn: () => projectsApi.getStatus(id!),
+    enabled: !!id,
+  });
+
+  // 3. Project tasks
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['project', id, 'tasks'],
     queryFn: () => projectsApi.getTasks(id!),
     enabled: !!id,
   });
 
-  // GitHub issues
-  const { data: ghData, isLoading: ghLoading } = useQuery({
-    queryKey: ['project-github', id],
+  // 4. Project members
+  const { data: members = [] } = useQuery({
+    queryKey: ['project', id, 'members'],
+    queryFn: () => projectsApi.getMembers(id!),
+    enabled: !!id,
+  });
+
+  // 5. All users (for add member dropdown)
+  const { data: allUsers = [] } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => usersApi.list(),
+  });
+
+  // 6. GitHub issues (if github repo linked)
+  const { data: ghData, isLoading: loadingGh } = useQuery({
+    queryKey: ['project', id, 'github'],
     queryFn: () => projectsApi.getGithubIssues(id!),
     enabled: !!id && !!project?.githubRepo,
   });
 
-  // AI Summary mutation
-  const [summary, setSummary] = useState<string | null>(null);
-  const summaryMutation = useMutation({
+  // Mutations
+  const toggleTaskMutation = useMutation({
+    mutationFn: ({ taskId, currentStatus }: { taskId: string; currentStatus: string }) =>
+      tasksApi.update(taskId, { status: currentStatus === 'done' ? 'todo' : 'done' }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['priorities'] });
+      queryClient.invalidateQueries({ queryKey: ['deadlines'] });
+    },
+  });
+
+  const createTaskMutation = useMutation({
+    mutationFn: (data: Partial<Task>) => tasksApi.create({ ...data, projectId: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['priorities'] });
+      setIsTaskFormOpen(false);
+      setTaskTitle('');
+      setTaskDueDate('');
+    },
+  });
+
+  const deleteTaskMutation = useMutation({
+    mutationFn: (taskId: string) => tasksApi.delete(taskId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['project', id] }),
+  });
+
+  const summarizeMutation = useMutation({
     mutationFn: () => projectsApi.summarize(id!),
     onSuccess: (data) => setSummary(data),
   });
 
-  // Create task mutation
-  const createTaskMutation = useMutation({
-    mutationFn: (data: Partial<Task>) => tasksApi.create({ ...data, projectId: id }),
+  const addMemberMutation = useMutation({
+    mutationFn: (data: { userId: string; role: string }) =>
+      projectsApi.addMember(id!, data),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project-tasks', id] });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-      setShowTaskForm(false);
-      setTaskForm({ title: '', description: '', priority: 'medium', dueDate: '' });
+      queryClient.invalidateQueries({ queryKey: ['project', id, 'members'] });
+      setNewMemberUserId('');
     },
   });
 
-  // Update task mutation
-  const updateTaskMutation = useMutation({
-    mutationFn: ({ taskId, data }: { taskId: string; data: Partial<Task> }) =>
-      tasksApi.update(taskId, data),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project-tasks', id] });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-
-  // Delete task mutation
-  const deleteTaskMutation = useMutation({
-    mutationFn: (taskId: string) => tasksApi.delete(taskId),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project-tasks', id] });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-    },
-  });
-
-  // Convert GitHub issue to Task mutation
-  const convertMutation = useMutation({
+  const convertIssueMutation = useMutation({
     mutationFn: (issue: GitHubIssue) =>
       projectsApi.convertIssue(id!, {
         title: issue.title,
-        description: issue.body ?? `Imported from GitHub issue #${issue.number}`,
+        description: issue.body || undefined,
         issueNumber: issue.number,
         issueUrl: issue.url,
-        priority: issue.labels.some((l) => l.includes('high') || l.includes('critical'))
-          ? 'high'
-          : 'medium',
+        priority: 'high',
       }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['project-tasks', id] });
-      qc.invalidateQueries({ queryKey: ['tasks'] });
-      setActiveTab('tasks');
+      queryClient.invalidateQueries({ queryKey: ['project', id, 'tasks'] });
+      alert('Issue converted to TrackMate task!');
     },
   });
 
-  if (pLoading) {
-    return (
-      <div style={{ display: 'flex', justifyContent: 'center', padding: 80 }}>
-        <div className="spinner spinner-lg" />
-      </div>
-    );
+  if (loadingProject) {
+    return <div className="p-12 text-center text-sm text-slate-500">Loading project details...</div>;
   }
 
-  if (pError || !project) {
+  if (!project) {
     return (
-      <div className="card empty-state fade-in" style={{ padding: 48, textAlign: 'center' }}>
-        <AlertCircle size={40} style={{ color: 'var(--danger)', marginBottom: 12 }} />
-        <h3>Project not found</h3>
-        <p style={{ color: 'var(--text-secondary)', marginBottom: 20 }}>
-          The requested project does not exist or has been deleted.
-        </p>
-        <Link to="/projects" className="btn btn-primary">
-          <ArrowLeft size={16} /> Back to Projects
+      <div className="p-12 text-center">
+        <p className="text-base text-red-400">Project not found.</p>
+        <Link to="/projects" className="text-xs text-indigo-400 hover:underline mt-2 inline-block">
+          ← Back to Projects
         </Link>
       </div>
     );
   }
 
-  const doneCount = tasks.filter((t) => t.status === 'done').length;
-  const progressPct = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
-  const issuesList = ghData?.issues ?? [];
+  const filteredTasks = tasks.filter(
+    (t) => taskStatusFilter === 'all' || t.status === taskStatusFilter
+  );
 
   return (
-    <div className="fade-in">
-      {/* Top breadcrumb & actions */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-        <Link to="/projects" className="btn btn-ghost btn-sm" style={{ gap: 6 }}>
-          <ArrowLeft size={15} /> All Projects
-        </Link>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <button
-            className="btn btn-secondary btn-sm"
-            onClick={() => summaryMutation.mutate()}
-            disabled={summaryMutation.isPending}
-            style={{ gap: 6 }}
-          >
-            <Sparkles size={14} style={{ color: 'var(--accent-1)' }} />
-            {summaryMutation.isPending ? 'Generating Summary…' : 'AI Summary'}
-          </button>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={() => setShowTaskForm(true)}
-            style={{ gap: 6 }}
-          >
-            <Plus size={14} /> Add Task
-          </button>
-        </div>
-      </div>
-
-      {/* Project Header Banner */}
-      <div className="card" style={{ marginBottom: 24, position: 'relative', overflow: 'hidden' }}>
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: 5,
-            bottom: 0,
-            background: 'var(--accent-grad)',
-          }}
-        />
-        <div style={{ paddingLeft: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                <h1 style={{ fontSize: 22, fontWeight: 700 }}>{project.name}</h1>
-                <span className={`badge badge-${project.status === 'active' ? 'success' : 'info'}`}>
-                  {project.status}
-                </span>
-              </div>
-              {project.description && (
-                <p style={{ color: 'var(--text-secondary)', fontSize: 14, maxWidth: 650, lineHeight: 1.5, marginBottom: 12 }}>
-                  {project.description}
-                </p>
-              )}
-            </div>
-
-            {project.githubRepo && (
-              <a
-                href={`https://github.com/${project.githubRepo}`}
-                target="_blank"
-                rel="noreferrer"
-                className="btn btn-secondary btn-sm"
-                style={{ gap: 6 }}
-              >
-                <Github size={15} />
-                {project.githubRepo}
-                <ExternalLink size={12} style={{ opacity: 0.6 }} />
-              </a>
-            )}
-          </div>
-
-          {/* Progress bar */}
-          <div style={{ marginTop: 14, maxWidth: 500 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>
-              <span>Project Completion ({doneCount} of {tasks.length} tasks)</span>
-              <span style={{ fontWeight: 600 }}>{progressPct}%</span>
-            </div>
-            <div className="progress-bar">
-              <div className="progress-fill" style={{ width: `${progressPct}%` }} />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* AI Summary Card (if generated) */}
-      {(summary || summaryMutation.isPending) && (
-        <div className="card fade-in" style={{ marginBottom: 24, border: '1px solid var(--accent-1)', background: 'rgba(99, 102, 241, 0.05)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <Bot size={18} style={{ color: 'var(--accent-1)' }} />
-            <h3 style={{ fontSize: 15, fontWeight: 700 }}>AI Project Status & Recommendation</h3>
-          </div>
-          {summaryMutation.isPending ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text-secondary)', fontSize: 13, padding: '12px 0' }}>
-              <div className="spinner" style={{ width: 16, height: 16 }} />
-              Analyzing project state and computing recommendations via MCP tools…
-            </div>
-          ) : (
-            <div style={{ fontSize: 14, lineHeight: 1.6, color: 'var(--text-primary)', whiteSpace: 'pre-wrap' }}>
-              {summary}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Task Creation Form */}
-      {showTaskForm && (
-        <div className="card fade-in" style={{ marginBottom: 24 }}>
-          <h3 style={{ fontWeight: 700, fontSize: 15, marginBottom: 14 }}>Create Task in {project.name}</h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div className="form-group">
-              <label className="form-label">Task Title *</label>
-              <input
-                className="form-input"
-                placeholder="What needs to be done?"
-                value={taskForm.title}
-                onChange={(e) => setTaskForm({ ...taskForm, title: e.target.value })}
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Description</label>
-              <textarea
-                className="form-textarea"
-                placeholder="Add details, subtasks, or context…"
-                value={taskForm.description}
-                onChange={(e) => setTaskForm({ ...taskForm, description: e.target.value })}
-              />
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <div className="form-group">
-                <label className="form-label">Priority</label>
-                <select
-                  className="form-select"
-                  value={taskForm.priority}
-                  onChange={(e) => setTaskForm({ ...taskForm, priority: e.target.value as Priority })}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="critical">Critical</option>
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Due Date</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  value={taskForm.dueDate}
-                  onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
-                />
-              </div>
-            </div>
-            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end', marginTop: 4 }}>
-              <button className="btn btn-secondary" onClick={() => setShowTaskForm(false)}>
-                Cancel
-              </button>
-              <button
-                className="btn btn-primary"
-                disabled={!taskForm.title.trim() || createTaskMutation.isPending}
-                onClick={() =>
-                  createTaskMutation.mutate({
-                    ...taskForm,
-                    status: 'todo',
-                    dueDate: taskForm.dueDate || undefined,
-                  })
-                }
-              >
-                {createTaskMutation.isPending ? 'Creating…' : 'Create Task'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 8, borderBottom: '1px solid var(--border)', marginBottom: 20 }}>
-        <button
-          className={`btn btn-ghost ${activeTab === 'tasks' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tasks')}
-          style={{
-            borderBottom: activeTab === 'tasks' ? '2px solid var(--accent-1)' : '2px solid transparent',
-            borderRadius: 0,
-            padding: '10px 16px',
-            fontWeight: activeTab === 'tasks' ? 700 : 500,
-            color: activeTab === 'tasks' ? 'var(--accent-1)' : 'var(--text-secondary)',
-          }}
+    <div className="space-y-6 max-w-7xl mx-auto pb-12">
+      {/* ── Back & Top Actions ──────────────────────────────────────────── */}
+      <div className="flex items-center justify-between border-b border-white/5 pb-4">
+        <Link
+          to="/projects"
+          className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-white transition-colors"
         >
-          <CheckSquare size={16} /> Tasks ({tasks.length})
+          <ArrowLeft size={14} /> Back to Projects
+        </Link>
+
+        <button
+          onClick={() => summarizeMutation.mutate()}
+          disabled={summarizeMutation.isPending}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors disabled:opacity-50"
+        >
+          <Sparkles size={14} />
+          {summarizeMutation.isPending ? 'Analyzing with AI...' : 'AI Project Summary'}
         </button>
+      </div>
+
+      {/* ── Project Header ──────────────────────────────────────────────── */}
+      <div className="p-6 rounded-xl bg-slate-900/60 border border-white/5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <span
+              className="w-4 h-4 rounded-full flex-shrink-0"
+              style={{ backgroundColor: project.color || '#6366f1' }}
+            />
+            <h1 className="text-2xl font-bold text-white tracking-tight">{project.name}</h1>
+          </div>
+          <span className="text-xs uppercase font-semibold px-2.5 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 self-start sm:self-auto">
+            {project.status}
+          </span>
+        </div>
+
+        {project.description && (
+          <p className="text-sm text-slate-400 max-w-3xl">{project.description}</p>
+        )}
 
         {project.githubRepo && (
-          <button
-            className={`btn btn-ghost ${activeTab === 'github' ? 'active' : ''}`}
-            onClick={() => setActiveTab('github')}
-            style={{
-              borderBottom: activeTab === 'github' ? '2px solid var(--accent-1)' : '2px solid transparent',
-              borderRadius: 0,
-              padding: '10px 16px',
-              fontWeight: activeTab === 'github' ? 700 : 500,
-              color: activeTab === 'github' ? 'var(--accent-1)' : 'var(--text-secondary)',
-            }}
-          >
-            <Github size={16} /> GitHub Issues ({issuesList.length})
-          </button>
+          <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
+            <Github size={14} className="text-slate-500" />
+            <a
+              href={`https://github.com/${project.githubRepo}`}
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-400 hover:underline flex items-center gap-1"
+            >
+              {project.githubRepo} <ExternalLink size={11} />
+            </a>
+          </div>
+        )}
+
+        {/* ── Progress Strip ──────────────────────────────────────────────── */}
+        {progress && (
+          <div className="pt-4 border-t border-white/5 space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+              <div className="p-3 rounded-lg bg-slate-800/40 border border-white/5">
+                <span className="text-[11px] text-slate-400 uppercase">Completion</span>
+                <p className="text-lg font-bold text-indigo-400 mt-0.5">
+                  {progress.completionPercentage}%
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-800/40 border border-white/5">
+                <span className="text-[11px] text-slate-400 uppercase">Done</span>
+                <p className="text-lg font-bold text-emerald-400 mt-0.5">
+                  {progress.completedTasks}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-800/40 border border-white/5">
+                <span className="text-[11px] text-slate-400 uppercase">In Progress</span>
+                <p className="text-lg font-bold text-blue-400 mt-0.5">
+                  {progress.inProgressTasks}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-800/40 border border-white/5">
+                <span className="text-[11px] text-slate-400 uppercase">Blocked</span>
+                <p className="text-lg font-bold text-red-400 mt-0.5">
+                  {progress.blockedTasks}
+                </p>
+              </div>
+              <div className="p-3 rounded-lg bg-slate-800/40 border border-white/5 col-span-2 sm:col-span-1">
+                <span className="text-[11px] text-slate-400 uppercase">Total Tasks</span>
+                <p className="text-lg font-bold text-white mt-0.5">{progress.totalTasks}</p>
+              </div>
+            </div>
+
+            {/* Progress bar */}
+            <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-indigo-500 transition-all duration-500"
+                style={{ width: `${progress.completionPercentage}%` }}
+              />
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Tab: Tasks */}
-      {activeTab === 'tasks' && (
-        <div>
-          {tLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-              <div className="spinner spinner-lg" />
-            </div>
-          ) : tasks.length === 0 ? (
-            <div className="card empty-state" style={{ padding: 48 }}>
-              <Filter size={36} style={{ color: 'var(--text-muted)', marginBottom: 12 }} />
-              <p>No tasks in this project yet.</p>
-              <button
-                className="btn btn-primary btn-sm"
-                onClick={() => setShowTaskForm(true)}
-                style={{ marginTop: 12 }}
-              >
-                <Plus size={14} /> Add your first task
-              </button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {tasks.map((task: Task) => (
-                <TaskCard
-                  key={task.id}
-                  task={task}
-                  onStatusChange={(t, status) =>
-                    updateTaskMutation.mutate({ taskId: t.id, data: { status: status as TaskStatus } })
-                  }
-                  onDelete={(t) => deleteTaskMutation.mutate(t.id)}
-                />
-              ))}
-            </div>
-          )}
+      {/* ── AI Generated Summary Box ────────────────────────────────────── */}
+      {summary && (
+        <div className="p-5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400 flex items-center gap-1.5">
+              <Sparkles size={14} /> AI Project Briefing
+            </span>
+            <button
+              onClick={() => setSummary(null)}
+              className="text-xs text-slate-500 hover:text-slate-300"
+            >
+              Dismiss
+            </button>
+          </div>
+          <div className="text-xs leading-relaxed text-slate-200 whitespace-pre-line font-mono bg-slate-900/60 p-4 rounded-lg border border-white/5">
+            {summary}
+          </div>
         </div>
       )}
 
-      {/* Tab: GitHub Issues */}
-      {activeTab === 'github' && project.githubRepo && (
-        <div>
-          {ghLoading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: 48 }}>
-              <div className="spinner spinner-lg" />
+      {/* ── Blockers Alert (if any) ─────────────────────────────────────── */}
+      {progress && progress.blockers && progress.blockers.length > 0 && (
+        <div className="p-4 rounded-xl bg-red-950/20 border border-red-900/30 flex items-start gap-3 text-red-300">
+          <AlertTriangle size={18} className="text-red-400 flex-shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-red-400">
+              Active Project Blockers Requiring Immediate Attention:
+            </p>
+            <ul className="text-xs space-y-0.5 list-disc list-inside text-slate-300">
+              {progress.blockers.map((b, bi) => (
+                <li key={bi}>{b}</li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
+
+      {/* ── Tabbed View (Tasks, Members, GitHub) ─────────────────────────── */}
+      <div className="space-y-4">
+        {/* Tab Headers */}
+        <div className="flex items-center gap-2 border-b border-white/5 pb-2">
+          <button
+            onClick={() => setActiveTab('tasks')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+              activeTab === 'tasks'
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+          >
+            <Layers size={13} /> Tasks ({tasks.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('members')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+              activeTab === 'members'
+                ? 'bg-indigo-600 text-white'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+            }`}
+          >
+            <Users size={13} /> Team Members ({members.length})
+          </button>
+
+          {project.githubRepo && (
+            <button
+              onClick={() => setActiveTab('github')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center gap-1.5 ${
+                activeTab === 'github'
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              <Github size={13} /> GitHub Issues ({ghData?.issues?.length ?? 0})
+            </button>
+          )}
+        </div>
+
+        {/* ── TAB 1: Tasks ──────────────────────────────────────────────── */}
+        {activeTab === 'tasks' && (
+          <div className="space-y-3">
+            {/* Filter toolbar & Add Task */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <select
+                  value={taskStatusFilter}
+                  onChange={(e) => setTaskStatusFilter(e.target.value)}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-slate-900 text-slate-300 border border-white/10 focus:outline-none"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="todo">To Do</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="done">Done</option>
+                  <option value="blocked">Blocked</option>
+                </select>
+              </div>
+
+              <button
+                onClick={() => setIsTaskFormOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white transition-colors self-start sm:self-auto"
+              >
+                <Plus size={13} /> Add Task
+              </button>
             </div>
-          ) : issuesList.length === 0 ? (
-            <div className="card empty-state" style={{ padding: 48 }}>
-              <Github size={36} style={{ color: 'var(--text-muted)', marginBottom: 12 }} />
-              <p>No open issues found in {project.githubRepo}.</p>
+
+            {/* Inline Task Form */}
+            {isTaskFormOpen && (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (!taskTitle.trim()) return;
+                  createTaskMutation.mutate({
+                    title: taskTitle.trim(),
+                    priority: taskPriority,
+                    dueDate: taskDueDate || undefined,
+                    status: 'todo',
+                  });
+                }}
+                className="p-4 rounded-xl bg-slate-900 border border-white/10 space-y-3"
+              >
+                <input
+                  type="text"
+                  required
+                  value={taskTitle}
+                  onChange={(e) => setTaskTitle(e.target.value)}
+                  placeholder="Task title..."
+                  className="w-full px-3 py-1.5 text-sm rounded bg-slate-800 text-white border border-white/10 focus:outline-none focus:border-indigo-500"
+                />
+                <div className="flex items-center gap-3 flex-wrap">
+                  <select
+                    value={taskPriority}
+                    onChange={(e) => setTaskPriority(e.target.value as Priority)}
+                    className="px-2 py-1 text-xs rounded bg-slate-800 text-slate-300 border border-white/10"
+                  >
+                    <option value="low">Low Priority</option>
+                    <option value="medium">Medium Priority</option>
+                    <option value="high">High Priority</option>
+                    <option value="critical">Critical Priority</option>
+                  </select>
+                  <input
+                    type="date"
+                    value={taskDueDate}
+                    onChange={(e) => setTaskDueDate(e.target.value)}
+                    className="px-2 py-1 text-xs rounded bg-slate-800 text-slate-300 border border-white/10"
+                  />
+                  <div className="flex-1" />
+                  <button
+                    type="button"
+                    onClick={() => setIsTaskFormOpen(false)}
+                    className="px-3 py-1 text-xs text-slate-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={createTaskMutation.isPending}
+                    className="px-3 py-1 text-xs rounded bg-indigo-600 text-white font-medium"
+                  >
+                    Save Task
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Tasks list */}
+            <div className="rounded-xl bg-slate-900/60 border border-white/5 divide-y divide-white/5">
+              {filteredTasks.length === 0 ? (
+                <div className="p-8 text-center text-xs text-slate-500">
+                  No tasks match the selected filter.
+                </div>
+              ) : (
+                filteredTasks.map((t) => (
+                  <div
+                    key={t.id}
+                    className="p-3.5 flex items-center justify-between gap-3 hover:bg-white/[0.02] transition-colors"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <button
+                        onClick={() =>
+                          toggleTaskMutation.mutate({
+                            taskId: t.id,
+                            currentStatus: t.status,
+                          })
+                        }
+                        className={`w-4 h-4 rounded flex items-center justify-center border transition-colors ${
+                          t.status === 'done'
+                            ? 'bg-emerald-500 border-emerald-500 text-slate-950'
+                            : 'border-slate-600 text-transparent hover:border-indigo-400'
+                        }`}
+                      >
+                        <Check size={11} strokeWidth={3} />
+                      </button>
+
+                      <div className="min-w-0">
+                        <p
+                          className={`text-sm font-medium ${
+                            t.status === 'done' ? 'line-through text-slate-500' : 'text-white'
+                          }`}
+                        >
+                          {t.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5 text-xs text-slate-500">
+                          {t.dueDate && (
+                            <span className="font-mono text-[11px] text-slate-400">
+                              Due {t.dueDate}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] uppercase font-semibold px-2 py-0.5 rounded ${
+                          t.priority === 'critical'
+                            ? 'text-red-400 bg-red-400/10'
+                            : t.priority === 'high'
+                            ? 'text-amber-400 bg-amber-400/10'
+                            : 'text-slate-400 bg-slate-800'
+                        }`}
+                      >
+                        {t.priority}
+                      </span>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Delete task "${t.title}"?`)) {
+                            deleteTaskMutation.mutate(t.id);
+                          }
+                        }}
+                        className="p-1 text-slate-500 hover:text-red-400 transition-colors"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {issuesList.map((issue: GitHubIssue) => {
-                const isAlreadyImported = tasks.some(
-                  (t) => t.githubIssueNumber === issue.number || t.title === issue.title
-                );
-                return (
+          </div>
+        )}
+
+        {/* ── TAB 2: Members ─────────────────────────────────────────────── */}
+        {activeTab === 'members' && (
+          <div className="space-y-4">
+            {/* Add member form */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!newMemberUserId) return;
+                addMemberMutation.mutate({
+                  userId: newMemberUserId,
+                  role: newMemberRole,
+                });
+              }}
+              className="flex items-center gap-2 p-3 rounded-xl bg-slate-900 border border-white/10"
+            >
+              <select
+                value={newMemberUserId}
+                onChange={(e) => setNewMemberUserId(e.target.value)}
+                className="flex-1 px-3 py-1.5 text-xs rounded bg-slate-800 text-slate-200 border border-white/10"
+              >
+                <option value="">Select team user to assign...</option>
+                {allUsers.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.name} ({u.email})
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={newMemberRole}
+                onChange={(e) => setNewMemberRole(e.target.value)}
+                className="px-3 py-1.5 text-xs rounded bg-slate-800 text-slate-200 border border-white/10"
+              >
+                <option value="member">Member</option>
+                <option value="owner">Owner</option>
+                <option value="admin">Admin</option>
+                <option value="viewer">Viewer</option>
+              </select>
+
+              <button
+                type="submit"
+                disabled={!newMemberUserId || addMemberMutation.isPending}
+                className="px-3 py-1.5 text-xs font-medium rounded bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-50"
+              >
+                Add Member
+              </button>
+            </form>
+
+            {/* Members list */}
+            <div className="rounded-xl bg-slate-900/60 border border-white/5 divide-y divide-white/5">
+              {members.map((m, idx) => (
+                <div key={idx} className="p-3.5 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <img
+                      src={
+                        m.user.avatarUrl ||
+                        `https://api.dicebear.com/9.x/avataaars/svg?seed=${m.user.name}`
+                      }
+                      alt={m.user.name}
+                      className="w-8 h-8 rounded-full bg-slate-800"
+                    />
+                    <div>
+                      <p className="text-sm font-medium text-white">{m.user.name}</p>
+                      <p className="text-xs text-slate-400">{m.user.email}</p>
+                    </div>
+                  </div>
+                  <span className="text-xs uppercase font-semibold px-2 py-0.5 rounded bg-white/5 text-slate-300">
+                    {m.role}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 3: GitHub Issues ───────────────────────────────────────── */}
+        {activeTab === 'github' && (
+          <div className="space-y-3">
+            {loadingGh ? (
+              <div className="p-8 text-center text-xs text-slate-500">Loading GitHub issues...</div>
+            ) : !ghData?.issues || ghData.issues.length === 0 ? (
+              <div className="p-8 text-center text-xs text-slate-500">
+                No open GitHub issues found for {project.githubRepo}.
+              </div>
+            ) : (
+              <div className="rounded-xl bg-slate-900/60 border border-white/5 divide-y divide-white/5">
+                {ghData.issues.map((issue) => (
                   <div
                     key={issue.id}
-                    className="card fade-in"
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      gap: 16,
-                      padding: '16px 20px',
-                    }}
+                    className="p-3.5 flex items-center justify-between gap-3 hover:bg-white/[0.02]"
                   >
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)' }}>
-                          #{issue.number}
-                        </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-indigo-400">#{issue.number}</span>
                         <a
                           href={issue.url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{
-                            fontSize: 14,
-                            fontWeight: 600,
-                            color: 'var(--text-primary)',
-                            textDecoration: 'none',
-                          }}
+                          className="text-sm font-medium text-white hover:underline truncate"
                         >
                           {issue.title}
                         </a>
                       </div>
-
-                      {issue.body && (
-                        <p
-                          style={{
-                            fontSize: 12,
-                            color: 'var(--text-secondary)',
-                            lineHeight: 1.4,
-                            marginBottom: 8,
-                            maxHeight: 40,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                          }}
-                        >
-                          {issue.body}
-                        </p>
-                      )}
-
-                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                        {issue.labels.map((l) => (
-                          <span key={l} className="badge badge-info" style={{ fontSize: 10 }}>
-                            {l}
-                          </span>
-                        ))}
-                        {issue.assignees.length > 0 && (
-                          <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                            assigned to @{issue.assignees.join(', @')}
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        State: {issue.state} · Updated: {new Date(issue.updatedAt).toLocaleDateString()}
+                      </p>
                     </div>
 
                     <button
-                      className="btn btn-secondary btn-sm"
-                      disabled={isAlreadyImported || convertMutation.isPending}
-                      onClick={() => convertMutation.mutate(issue)}
-                      style={{ flexShrink: 0, gap: 4 }}
+                      onClick={() => convertIssueMutation.mutate(issue)}
+                      disabled={convertIssueMutation.isPending}
+                      className="px-2.5 py-1 text-xs rounded bg-white/5 hover:bg-indigo-600/20 hover:text-indigo-300 text-slate-300 transition-colors border border-white/10 flex-shrink-0"
                     >
-                      {isAlreadyImported ? (
-                        <>
-                          <CheckSquare size={13} style={{ color: 'var(--success)' }} />
-                          Imported
-                        </>
-                      ) : (
-                        <>
-                          <Plus size={13} />
-                          Convert to Task
-                        </>
-                      )}
+                      Convert to Task
                     </button>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

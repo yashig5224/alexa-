@@ -4,68 +4,98 @@ import {
   LayoutDashboard,
   FolderKanban,
   CheckSquare,
-  Users,
+  Calendar,
   Bot,
-  GitBranch,
+  Github,
+  Users,
   Settings,
   Zap,
 } from 'lucide-react';
 
-const navItems = [
+const mainNavItems = [
   { to: '/',          icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/tasks',     icon: CheckSquare,     label: 'My Tasks'  },
   { to: '/projects',  icon: FolderKanban,    label: 'Projects'  },
-  { to: '/tasks',     icon: CheckSquare,     label: 'Tasks'     },
+  { to: '/deadlines', icon: Calendar,        label: 'Deadlines' },
+  { to: '/ai',        icon: Bot,             label: 'AI Assistant', badge: 'MCP' },
+  { to: '/github',    icon: Github,          label: 'GitHub',       badge: 'NEW' },
   { to: '/team',      icon: Users,           label: 'Team'      },
-  { to: '/github',    icon: GitBranch,       label: 'GitHub'    },
-  { to: '/ai',        icon: Bot,             label: 'AI Agent', badge: true },
 ];
 
 export default function Sidebar() {
   return (
-    <nav className="sidebar">
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <Zap size={18} color="#fff" />
+    <aside className="sidebar flex flex-col justify-between h-full w-60 border-r border-border bg-surface-card shrink-0">
+      <div>
+        {/* Logo */}
+        <div className="sidebar-logo flex items-center gap-2.5 px-5 py-5 border-b border-border/60">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center shadow-sm">
+            <Zap size={16} className="text-white fill-white" />
+          </div>
+          <div className="text-base font-bold tracking-tight text-white">
+            Track<span className="text-indigo-400">Mate</span>
+          </div>
         </div>
-        <div className="sidebar-logo-text">
-          Track<span>Mate</span>
+
+        {/* Main navigation */}
+        <div className="px-3 py-4">
+          <div className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-text-muted">
+            Workspace
+          </div>
+          <nav className="space-y-1">
+            {mainNavItems.map(({ to, icon: Icon, label, badge }) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                className={({ isActive }) =>
+                  `flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+                    isActive
+                      ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20'
+                      : 'text-text-secondary hover:text-white hover:bg-surface-elevated/70'
+                  }`
+                }
+              >
+                <div className="flex items-center gap-2.5">
+                  <Icon size={16} />
+                  <span>{label}</span>
+                </div>
+                {badge && (
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {badge}
+                  </span>
+                )}
+              </NavLink>
+            ))}
+          </nav>
         </div>
       </div>
 
-      {/* Main nav */}
-      <div className="sidebar-section">
-        <div className="sidebar-section-label">Navigation</div>
-        <nav className="sidebar-nav">
-          {navItems.map(({ to, icon: Icon, label, badge }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}
-            >
-              <Icon size={16} />
-              {label}
-              {badge && <span className="link-badge">AI</span>}
-            </NavLink>
-          ))}
-        </nav>
-      </div>
-
-      {/* Footer */}
-      <div className="sidebar-footer">
-        <NavLink to="/settings" className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`}>
+      {/* Footer / Settings & Profile */}
+      <div className="p-3 border-t border-border/60 space-y-2">
+        <NavLink
+          to="/settings"
+          className={({ isActive }) =>
+            `flex items-center gap-2.5 px-3 py-2 rounded-lg text-xs font-medium transition-colors ${
+              isActive
+                ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/20'
+                : 'text-text-secondary hover:text-white hover:bg-surface-elevated/70'
+            }`
+          }
+        >
           <Settings size={16} />
-          Settings
+          <span>Settings</span>
         </NavLink>
-        <div className="sidebar-user">
-          <div className="sidebar-avatar">J</div>
-          <div className="sidebar-user-info">
-            <div className="sidebar-user-name">Jane Dev</div>
-            <div className="sidebar-user-role">Owner</div>
+
+        <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg bg-surface-elevated/50 border border-border/50">
+          <div className="w-7 h-7 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-xs font-bold text-indigo-400">
+            A
+          </div>
+          <div className="flex flex-col min-w-0">
+            <span className="text-xs font-semibold text-white truncate">Alex Chen</span>
+            <span className="text-[10px] text-text-muted truncate">Workspace Owner</span>
           </div>
         </div>
       </div>
-    </nav>
+    </aside>
   );
 }

@@ -89,19 +89,8 @@ export interface McpToolCallParams {
   arguments?: Record<string, unknown>;
 }
 
-// GitHub Issue (used by get_github_issues tool)
-export interface GitHubIssue {
-  id: number;
-  number: number;
-  title: string;
-  state: 'open' | 'closed';
-  url: string;
-  labels: string[];
-  assignees: string[];
-  createdAt: string;
-  updatedAt: string;
-  body: string | null;
-}
+// Re-export GitHub types
+export type { GitHubIssue } from './github.js';
 
 // Daily priority item (used by get_daily_priorities tool)
 export interface PriorityItem {

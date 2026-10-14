@@ -2,16 +2,19 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Sidebar from './components/Sidebar';
 import DashboardPage from './pages/DashboardPage';
-import TasksPage    from './pages/TasksPage';
+import TasksPage from './pages/TasksPage';
 import ProjectsPage from './pages/ProjectsPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
-import TeamPage     from './pages/TeamPage';
-import AIChatPage   from './pages/AIChatPage';
+import DeadlinesPage from './pages/DeadlinesPage';
+import AIChatPage from './pages/AIChatPage';
+import GitHubPage from './pages/GitHubPage';
+import SettingsPage from './pages/SettingsPage';
+import TeamPage from './pages/TeamPage';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000, // 30 s
+      staleTime: 30_000,
       retry: 2,
     },
   },
@@ -19,9 +22,9 @@ const queryClient = new QueryClient({
 
 function NotFound() {
   return (
-    <div style={{ textAlign: 'center', padding: '80px 0' }}>
-      <h2 style={{ fontSize: 48, fontWeight: 800, color: 'var(--text-muted)' }}>404</h2>
-      <p style={{ color: 'var(--text-secondary)', marginTop: 8 }}>Page not found.</p>
+    <div className="text-center py-24 space-y-2">
+      <h2 className="text-5xl font-black text-text-muted">404</h2>
+      <p className="text-sm text-text-secondary">Page not found.</p>
     </div>
   );
 }
@@ -30,17 +33,20 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <div className="app-shell">
+        <div className="app-shell flex h-screen overflow-hidden bg-surface-base text-text-primary">
           <Sidebar />
-          <main className="main-content">
+          <main className="main-content flex-1 overflow-y-auto px-6 py-6 md:px-8">
             <Routes>
-              <Route path="/"              element={<DashboardPage />} />
-              <Route path="/projects"      element={<ProjectsPage />}  />
-              <Route path="/projects/:id"  element={<ProjectDetailPage />} />
-              <Route path="/tasks"         element={<TasksPage />}     />
-              <Route path="/team"          element={<TeamPage />}      />
-              <Route path="/ai"            element={<AIChatPage />}    />
-              <Route path="*"              element={<NotFound />}      />
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/tasks" element={<TasksPage />} />
+              <Route path="/projects" element={<ProjectsPage />} />
+              <Route path="/projects/:id" element={<ProjectDetailPage />} />
+              <Route path="/deadlines" element={<DeadlinesPage />} />
+              <Route path="/ai" element={<AIChatPage />} />
+              <Route path="/github" element={<GitHubPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/team" element={<TeamPage />} />
+              <Route path="*" element={<NotFound />} />
             </Routes>
           </main>
         </div>
