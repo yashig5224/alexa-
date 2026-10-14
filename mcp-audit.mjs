@@ -4,7 +4,7 @@
  * Run with: node mcp-audit.mjs
  */
 
-const BASE = 'http://localhost:3002';
+const BASE = process.env['MCP_SERVER_URL'] ?? 'http://127.0.0.1:3002';
 
 let pass = 0;
 let fail = 0;

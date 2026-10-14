@@ -1,8 +1,8 @@
 {
-  "name": "trackmate-ai",
+  "name": "qlyq",
   "version": "1.0.0",
   "private": true,
-  "description": "TrackMate AI — Agentic productivity platform for students and developers",
+  "description": "QLYQ — MCP-Powered AI Project and Developer Assistant",
   "packageManager": "npm@10.8.2",
   "workspaces": [
     "packages/*",

@@ -39,18 +39,27 @@ export default function App() {
         <div className="app-shell flex h-screen overflow-hidden bg-surface-base text-text-primary">
           <Sidebar />
           <main className="main-content flex-1 overflow-y-auto px-6 py-6 md:px-8">
-            <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/tasks" element={<TasksPage />} />
-              <Route path="/projects" element={<ProjectsPage />} />
-              <Route path="/projects/:id" element={<ProjectDetailPage />} />
-              <Route path="/deadlines" element={<DeadlinesPage />} />
-              <Route path="/ai" element={<AIChatPage />} />
-              <Route path="/github" element={<GitHubPage />} />
-              <Route path="/settings" element={<SettingsPage />} />
-              <Route path="/team" element={<TeamPage />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
+            <Suspense
+              fallback={
+                <div className="h-64 flex flex-col items-center justify-center gap-3 text-text-muted">
+                  <div className="w-6 h-6 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+                  <span className="text-xs font-mono tracking-wider uppercase">Loading...</span>
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/" element={<DashboardPage />} />
+                <Route path="/tasks" element={<TasksPage />} />
+                <Route path="/projects" element={<ProjectsPage />} />
+                <Route path="/projects/:id" element={<ProjectDetailPage />} />
+                <Route path="/deadlines" element={<DeadlinesPage />} />
+                <Route path="/ai" element={<AIChatPage />} />
+                <Route path="/github" element={<GitHubPage />} />
+                <Route path="/settings" element={<SettingsPage />} />
+                <Route path="/team" element={<TeamPage />} />
+                <Route path="*" element={<NotFound />} />
+              </Routes>
+            </Suspense>
           </main>
         </div>
       </BrowserRouter>
